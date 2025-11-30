@@ -1,0 +1,5 @@
+{
+  "name": "WebGPU Shader Fuzzer",
+  "description": "A creative coding environment and shader fuzzer. Write WGSL shaders, visualize them in real-time, and apply automated mutation algorithms to stress-test the renderer and discover new visual effects.",
+  "requestFramePermissions": []
+}
