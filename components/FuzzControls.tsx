@@ -16,7 +16,7 @@ const Toggle: React.FC<{
   onChange: (checked: boolean) => void;
   highlight?: boolean;
 }> = ({ label, checked, onChange, highlight }) => (
-  <label className="group flex items-center justify-between cursor-pointer py-1.5 hover:bg-zinc-900/50 transition-colors -mx-2 px-2 rounded">
+  <label className="group flex items-center justify-between cursor-pointer py-2.5 lg:py-1.5 hover:bg-zinc-900/50 transition-colors -mx-2 px-2 rounded min-h-[44px] lg:min-h-0">
     <span className={`text-sm font-medium tracking-tight ${highlight ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-200'}`}>
       {label}
     </span>
@@ -84,7 +84,7 @@ const FuzzControls: React.FC<FuzzControlsProps> = ({ config, setConfig, onFuzz, 
 
       <button
         onClick={onFuzz}
-        className="w-full py-4 bg-white text-black font-black text-lg tracking-wide hover:bg-emerald-400 transition-colors uppercase flex items-center justify-center gap-3 active:scale-[0.99]"
+        className="w-full py-4 lg:py-4 min-h-[52px] bg-white text-black font-black text-lg tracking-wide hover:bg-emerald-400 active:bg-emerald-300 transition-colors uppercase flex items-center justify-center gap-3 active:scale-[0.99]"
       >
         Mutate
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,12 +111,13 @@ const FuzzControls: React.FC<FuzzControlsProps> = ({ config, setConfig, onFuzz, 
             <h3 className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest mb-2">Presets</h3>
             <div className="grid grid-cols-2 gap-1">
                 {PRESETS.map(p => (
-                    <button 
+                    <button
                         key={p.name}
                         onClick={() => onReset(p.name)}
                         className="
-                          relative overflow-hidden group bg-zinc-900 border border-zinc-800 p-2 text-left
-                          hover:border-emerald-500/50 hover:bg-zinc-800 transition-all duration-300
+                          relative overflow-hidden group bg-zinc-900 border border-zinc-800 p-3 lg:p-2 text-left
+                          min-h-[44px] lg:min-h-0
+                          hover:border-emerald-500/50 hover:bg-zinc-800 active:bg-zinc-700 transition-all duration-300
                         "
                     >
                         <div className="absolute inset-0 bg-emerald-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"/>
