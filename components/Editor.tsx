@@ -14,7 +14,7 @@ const Editor: React.FC<EditorProps> = ({ code, onChange, error }) => {
       
       <div className="flex-grow relative bg-black">
         <textarea
-          className="w-full h-full bg-black text-zinc-400 font-mono text-xs p-8 leading-relaxed outline-none resize-none selection:bg-emerald-900 selection:text-white"
+          className="w-full h-full bg-black text-zinc-400 font-mono text-xs p-4 lg:p-8 leading-relaxed outline-none resize-none selection:bg-emerald-900 selection:text-white"
           value={code}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
