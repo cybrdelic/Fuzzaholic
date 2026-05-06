@@ -20,6 +20,7 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [gpuReady, setGpuReady] = useState(false);
   
   // Use any for WebGPU refs since types might not be available in the environment
   const deviceRef = useRef<any | null>(null);
@@ -59,6 +60,9 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
               format: presentationFormat,
               alphaMode: 'premultiplied',
             });
+            setGpuReady(true);
+          } else {
+            setError("WebGPU canvas context could not be created.");
           }
         }
       } catch (e: any) {
@@ -78,6 +82,7 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
     const device = deviceRef.current;
     const context = contextRef.current;
 
+    if (!gpuReady) return;
     if (!device || !context) return;
 
     const buildPipeline = async () => {
@@ -198,7 +203,7 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
     };
 
     buildPipeline();
-  }, [fragmentCode, onCompilationError, onCompilationSuccess]);
+  }, [fragmentCode, gpuReady, onCompilationError, onCompilationSuccess]);
 
   // Render Loop
   useEffect(() => {
