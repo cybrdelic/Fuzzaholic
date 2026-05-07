@@ -763,6 +763,8 @@ Total Errors: ${allErrors.length}
     { mode: 'poster', label: 'Poster' },
     { mode: 'extrude', label: 'Extrude' },
     { mode: 'scan', label: 'Scan' },
+    { mode: 'graffiti', label: 'Graffiti' },
+    { mode: 'rupture', label: 'Rupture' },
   ];
   const scrollEffects: { mode: ScrollEffectMode; label: string }[] = [
     { mode: 'none', label: 'Static' },

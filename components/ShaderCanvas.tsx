@@ -31,17 +31,25 @@ const TEXT_COMPOSITE_FRAGMENT_SHADER = `
 @group(0) @binding(4) var<uniform> scroll : vec2<f32>;
 
 fn mask_at(uv: vec2<f32>) -> f32 {
-  return textureSample(textMaskTexture, fillSampler, uv).r;
+  let textUv = vec2<f32>(uv.x, 1.0 - uv.y);
+  return textureSample(textMaskTexture, fillSampler, textUv).r;
 }
 
 fn guide_at(uv: vec2<f32>) -> vec4<f32> {
-  return textureSample(textMaskTexture, fillSampler, uv);
+  let textUv = vec2<f32>(uv.x, 1.0 - uv.y);
+  return textureSample(textMaskTexture, fillSampler, textUv);
 }
 
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let px = vec2<f32>(0.00145, 0.00145);
-  let mask = guide_at(uv);
+  let pre = textureSample(shaderTexture, fillSampler, uv).rgb;
+  let rough = sin(dot(pre, vec3<f32>(4.7, -3.1, 2.6)) + uv.x * 47.0 + uv.y * 31.0 + time * 0.7);
+  let paintUv = uv + vec2<f32>(
+    sin(uv.y * 42.0 + pre.r * 7.0 + time * 0.32),
+    cos(uv.x * 38.0 + pre.g * 8.0 - time * 0.26)
+  ) * 0.006;
+  let mask = guide_at(paintUv);
   let text = mask.r;
   let scaffold = mask.g;
   let incision = mask.b;
@@ -67,7 +75,7 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let carvedUv = uv + warp * (0.5 + built);
   let refractedUv = uv - warp * (1.2 + scroll.y * 0.8);
 
-  let core = textureSample(shaderTexture, fillSampler, carvedUv).rgb;
+  let core = textureSample(shaderTexture, fillSampler, carvedUv + rough * scaffold * vec2<f32>(0.006, -0.004)).rgb;
   let under = textureSample(shaderTexture, fillSampler, uv + flow * 0.025).rgb;
   let r = textureSample(shaderTexture, fillSampler, refractedUv + vec2<f32>(0.008, -0.003)).r;
   let g = textureSample(shaderTexture, fillSampler, carvedUv).g;
@@ -82,8 +90,9 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let vein = vec3<f32>(contour * incision, scan * edge, scaffold * sourceEnergy) * (0.42 + sourceEnergy);
   let builtGlyph = material * (0.42 + 0.82 * bevelLight) + vein + edge * vec3<f32>(0.42, 0.48, 0.52);
   let substrate = under * (0.025 + 0.10 * halo) + chroma * halo * 0.16;
-  let construction = vec3<f32>(0.18, 0.92, 0.72) * scaffold * (0.18 + 0.42 * scan);
-  let alpha = clamp(built + edge * 0.8 + halo * 0.42, 0.0, 1.0);
+  let spray = smoothstep(0.58, 0.96, scaffold + rough * 0.18) * (1.0 - text * 0.35);
+  let construction = vec3<f32>(0.18, 0.92, 0.72) * scaffold * (0.18 + 0.42 * scan) + chroma * spray * 0.22;
+  let alpha = clamp(built + edge * 0.8 + halo * 0.42 + spray * 0.28, 0.0, 1.0);
   return vec4<f32>(mix(substrate + construction, builtGlyph, alpha), 1.0);
 }
 `;
@@ -184,6 +193,25 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         ctx.font = '900 82px Arial Black, Impact, sans-serif';
         if (stroke) ctx.strokeText('SHADER LAB', 604 + offsetX, 770 + offsetY);
         ctx.fillText('SHADER LAB', 604 + offsetX, 770 + offsetY);
+      } else if (textMode === 'graffiti') {
+        ctx.save();
+        ctx.translate(600 + offsetX, 630 + offsetY);
+        ctx.rotate(-0.08);
+        ctx.font = '900 235px Impact, Arial Black, sans-serif';
+        if (stroke) ctx.strokeText('FUZZ', -230, -40);
+        ctx.fillText('FUZZ', -230, -40);
+        ctx.rotate(0.13);
+        ctx.font = '900 175px Impact, Arial Black, sans-serif';
+        if (stroke) ctx.strokeText('AHOLIC', -300, 150);
+        ctx.fillText('AHOLIC', -300, 150);
+        ctx.restore();
+      } else if (textMode === 'rupture') {
+        ctx.font = '900 188px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 610 + offsetY);
+        ctx.fillText('FUZZAHOLIC', 600 + offsetX, 610 + offsetY);
+        ctx.font = '900 74px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('MATERIAL TYPE', 600 + offsetX, 745 + offsetY);
+        ctx.fillText('MATERIAL TYPE', 600 + offsetX, 745 + offsetY);
       } else {
         ctx.font = '900 155px Arial Black, Impact, sans-serif';
         if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 620 + offsetY);
@@ -203,6 +231,43 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
       ctx.moveTo(210, y);
       ctx.lineTo(990, y + Math.sin(y * 0.02) * 18);
       ctx.stroke();
+    }
+    if (textMode === 'graffiti' || textMode === 'rupture') {
+      const rng = (i: number) => Math.sin(i * 127.1 + (textMode === 'graffiti' ? 9.3 : 17.8)) * 43758.5453 % 1;
+      ctx.fillStyle = 'rgb(0,96,0)';
+      for (let i = 0; i < 420; i++) {
+        const x = 160 + Math.abs(rng(i)) * 880;
+        const y = 380 + Math.abs(rng(i + 11)) * 470;
+        const radius = textMode === 'graffiti' ? 1.5 + Math.abs(rng(i + 23)) * 7 : 1 + Math.abs(rng(i + 23)) * 4;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = 'rgb(0,0,116)';
+      ctx.lineWidth = textMode === 'graffiti' ? 12 : 7;
+      for (let i = 0; i < 26; i++) {
+        const x = 210 + Math.abs(rng(i + 41)) * 780;
+        const y = 455 + Math.abs(rng(i + 71)) * 280;
+        const drop = 45 + Math.abs(rng(i + 91)) * (textMode === 'graffiti' ? 180 : 90);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.bezierCurveTo(x + 18 * rng(i + 3), y + drop * 0.3, x - 24 * rng(i + 5), y + drop * 0.7, x + 8 * rng(i + 7), y + drop);
+        ctx.stroke();
+      }
+      if (textMode === 'rupture') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        for (let i = 0; i < 20; i++) {
+          const x = 210 + Math.abs(rng(i + 120)) * 820;
+          const y = 500 + Math.abs(rng(i + 160)) * 230;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(rng(i + 190) * 0.8);
+          ctx.fillRect(-70, -5, 140, 10 + Math.abs(rng(i + 200)) * 18);
+          ctx.restore();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
     }
     drawLayer('rgb(255,0,0)');
 
