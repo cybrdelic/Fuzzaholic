@@ -47,12 +47,24 @@ fn main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 }
 `;
 
+export const DISPLAY_FRAGMENT_SHADER = `
+@group(0) @binding(0) var displaySampler : sampler;
+@group(0) @binding(1) var displayTexture : texture_2d<f32>;
+
+@fragment
+fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
+  return textureSample(displayTexture, displaySampler, uv);
+}
+`;
+
 export const PRESETS: ShaderPreset[] = [
   {
     name: 'Triangle',
     code: `
 @group(0) @binding(0) var<uniform> time : f32;
 @group(0) @binding(1) var<uniform> resolution : vec2<f32>;
+@group(0) @binding(2) var<uniform> mouse : vec2<f32>;
+@group(0) @binding(3) var<uniform> scroll : vec2<f32>;
 
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
@@ -66,6 +78,8 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     code: `
 @group(0) @binding(0) var<uniform> time : f32;
 @group(0) @binding(1) var<uniform> resolution : vec2<f32>;
+@group(0) @binding(2) var<uniform> mouse : vec2<f32>;
+@group(0) @binding(3) var<uniform> scroll : vec2<f32>;
 
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
@@ -82,6 +96,8 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     code: `
 @group(0) @binding(0) var<uniform> time : f32;
 @group(0) @binding(1) var<uniform> resolution : vec2<f32>;
+@group(0) @binding(2) var<uniform> mouse : vec2<f32>;
+@group(0) @binding(3) var<uniform> scroll : vec2<f32>;
 
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
@@ -101,6 +117,8 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     code: `
 @group(0) @binding(0) var<uniform> time : f32;
 @group(0) @binding(1) var<uniform> resolution : vec2<f32>;
+@group(0) @binding(2) var<uniform> mouse : vec2<f32>;
+@group(0) @binding(3) var<uniform> scroll : vec2<f32>;
 
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {

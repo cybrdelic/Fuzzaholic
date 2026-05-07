@@ -4,13 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server.mjs",
+    "dev:vite": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "sql.js": "^1.13.0",
+    "wgsl_reflect": "^1.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
