@@ -15,7 +15,7 @@ npm ci
 npm run build
 ```
 
-and uploads `dist`.
+and publishes `dist` to the `gh-pages` branch. The repository Pages settings should use the existing `gh-pages` source.
 
 ## Local-only features
 
