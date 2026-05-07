@@ -38,3 +38,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: dist
           publish_branch: gh-pages
+
+      - name: Verify built asset paths
+        run: |
+          test -f dist/index.html
+          grep -q "/Fuzzaholic/assets/" dist/index.html
