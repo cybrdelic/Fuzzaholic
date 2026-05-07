@@ -36,6 +36,6 @@ export interface ShaderPreset {
 
 export type FuzzMode = 'fragment' | 'vertex-fragment' | 'compute';
 
-export type TextEffectMode = 'none' | 'poster' | 'extrude' | 'scan';
+export type TextEffectMode = 'none' | 'poster' | 'extrude' | 'scan' | 'graffiti' | 'rupture';
 
 export type ScrollEffectMode = 'none' | 'viewportExpand' | 'backgroundReveal';
