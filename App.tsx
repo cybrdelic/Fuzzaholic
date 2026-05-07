@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from './components/Editor';
 import LogViewer from './components/LogViewer';
 import ShaderCanvas from './components/ShaderCanvas';
@@ -6,10 +6,12 @@ import ShaderLibrary from './components/ShaderLibrary';
 import { PRESETS } from './constants';
 import { captureThumbnail } from './services/shaderStorage';
 import { generateAutoExplorationCandidate } from './services/autoExplorer';
-import { getFileDbHealth, getFileDbStats, getFileDbTaste, saveShaderToFileDb, saveTasteToFileDb } from './services/fileShaderDb';
+import { getFileDbHealth, getFileDbShaders, getFileDbStats, getFileDbTaste, getStorageCapability, importShadersToFileDb, importTasteToFileDb, saveShaderToFileDb, saveTasteToFileDb, StorageCapability } from './services/fileShaderDb';
 import { transformCurrentShader, ScopedTransformIntent } from './services/scopedShaderTransforms';
 import { fuzzShaderV2WithMode, generateFreshShaderV2WithMode, generateIntentShaderV2WithMode } from './services/v2Fuzzer';
 import { CompilationError, FuzzConfig, FuzzMode, LogEntry, PresetName, ScrollEffectMode, TextEffectMode } from './types';
+import { buildStandaloneEmbed } from './services/embedExport';
+import { bundleFilename, createFuzzaholicBundle, downloadText, parseFuzzaholicBundle } from './services/shaderBundle';
 
 type TasteLabel = 'liked' | 'disliked' | 'tooSimilar';
 type WorkspaceMode = 'discover' | 'effects' | 'library' | 'export';
@@ -21,7 +23,24 @@ interface TasteSample {
   timestamp: number;
 }
 
+interface CandidateMetrics {
+  seed: number;
+  selectedIndex: number;
+  candidateCount: number;
+  score: number;
+  novelty: number;
+  complexity: number;
+  restraint: number;
+  taste: number;
+}
+
 const MAX_TASTE_SAMPLES = 80;
+const EMPTY_STORAGE_CAPABILITY: StorageCapability = {
+  mode: 'unavailable',
+  ok: false,
+  dbPath: '',
+  message: 'Checking storage',
+};
 
 const App: React.FC = () => {
   const [code, setCode] = useState<string>(PRESETS[0].code);
@@ -52,8 +71,11 @@ const App: React.FC = () => {
   const [scrollEffectMode, setScrollEffectMode] = useState<ScrollEffectMode>('none');
   const [tasteSamples, setTasteSamples] = useState<TasteSample[]>([]);
   const [fileDbPath, setFileDbPath] = useState('');
+  const [storageCapability, setStorageCapability] = useState<StorageCapability>(EMPTY_STORAGE_CAPABILITY);
+  const [latestCandidateMetrics, setLatestCandidateMetrics] = useState<CandidateMetrics | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('discover');
   const [codeDockOpen, setCodeDockOpen] = useState(false);
+  const bundleInputRef = useRef<HTMLInputElement>(null);
 
   const addLog = useCallback((type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, {
@@ -69,16 +91,20 @@ const App: React.FC = () => {
     const loadFileDbState = async () => {
       try {
         const health = await getFileDbHealth();
+        setStorageCapability(health);
         setFileDbPath(health.dbPath);
         const [stats, taste] = await Promise.all([getFileDbStats(), getFileDbTaste()]);
         setLibraryCount(stats.totalCount);
         setTasteSamples(taste.slice(0, MAX_TASTE_SAMPLES) as TasteSample[]);
       } catch (e) {
-        console.error('Failed to load file database state:', e);
+        const capability = await getStorageCapability();
+        setStorageCapability(capability);
+        setFileDbPath(capability.dbPath);
+        addLog('warning', capability.message);
       }
     };
     loadFileDbState();
-  }, []);
+  }, [addLog]);
 
   // Note: SQLite auto-saves on each operation, no need for manual persist effect
   const handlePipelineModeChange = useCallback((nextMode: FuzzMode) => {
@@ -327,6 +353,7 @@ Total Errors: ${allErrors.length}
       setPendingCode(result.code);
       setCode(result.code);
       setHistoryCount(prev => prev + 1);
+      setLatestCandidateMetrics(result);
       addLog('success', `[Auto] Selected ${result.selectedIndex + 1}/${result.candidateCount} seed ${result.seed}`);
       addLog('info', `[Auto] novelty ${result.novelty.toFixed(2)} complexity ${result.complexity.toFixed(2)} restraint ${result.restraint.toFixed(2)} taste ${result.taste.toFixed(2)} score ${result.score.toFixed(2)}`);
     } catch (e) {
@@ -351,8 +378,12 @@ Total Errors: ${allErrors.length}
         metadata: { intensity: fuzzConfig.intensity },
       });
       const stats = await getFileDbStats();
+      const capability = await getStorageCapability();
+      setStorageCapability(capability);
       setLibraryCount(stats.totalCount);
-      addLog('success', `[Save] Permanently saved liked shader: ${name}`);
+      addLog('success', capability.mode === 'local-file-db'
+        ? `[Save] Permanently saved liked shader: ${name}`
+        : `[Save] Session saved liked shader. Export a bundle for permanence.`);
     } catch (e) {
       console.error('Failed to save liked shader to file database:', e);
       addLog('error', '[Save] File database save failed. Start with npm run dev.');
@@ -376,8 +407,12 @@ Total Errors: ${allErrors.length}
     });
 
     const stats = await getFileDbStats();
+    const capability = await getStorageCapability();
+    setStorageCapability(capability);
     setLibraryCount(stats.totalCount);
-    addLog('success', `[Save] Saved to file DB: ${name}`);
+    addLog('success', capability.mode === 'local-file-db'
+      ? `[Save] Saved to file DB: ${name}`
+      : `[Save] Session saved. Export a bundle for permanence.`);
   };
 
   const recordTasteAndAdvance = async (label: TasteLabel) => {
@@ -420,6 +455,7 @@ Total Errors: ${allErrors.length}
       setPendingCode(result.code);
       setCode(result.code);
       setHistoryCount(prev => prev + 1);
+      setLatestCandidateMetrics(result);
       addLog('success', `[Taste] Next candidate selected (${result.selectedIndex + 1}/${result.candidateCount})`);
     } catch (e) {
       addLog('error', `[Taste] Could not advance: ${e}`);
@@ -651,9 +687,52 @@ Total Errors: ${allErrors.length}
   };
 
   const handleCopyTextEmbed = async () => {
-    const snippet = `<section class="fuzzaholic-effect fuzzaholic-text-${textEffectMode} fuzzaholic-scroll-${scrollEffectMode}">\n  <canvas class="fuzzaholic-shader-fill"></canvas>\n  <h1>FUZZAHOLIC</h1>\n</section>\n<style>\n.fuzzaholic-effect { position: relative; min-height: 100vh; overflow: hidden; background: #000; }\n.fuzzaholic-shader-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }\n.fuzzaholic-effect h1 { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font: 900 clamp(4rem, 13vw, 15rem)/0.82 Arial Black, Impact, sans-serif; color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.55); mix-blend-mode: screen; }\n.fuzzaholic-text-extrude h1 { text-shadow: 8px 8px 0 rgba(255,255,255,.10), 16px 16px 0 rgba(16,185,129,.15); }\n.fuzzaholic-text-scan h1 { letter-spacing: .14em; }\n</style>\n<!-- WGSL copied separately with Copy WGSL. Current modes: text=${textEffectMode}, scroll=${scrollEffectMode}. -->`;
+    const snippet = buildStandaloneEmbed({
+      shaderCode: lastWorkingCode,
+      mode: pipelineMode,
+      textEffectMode,
+      scrollEffectMode,
+    });
     await navigator.clipboard.writeText(snippet);
-    addLog('success', 'Copied text-effect embed starter.');
+    addLog('success', pipelineMode === 'fragment'
+      ? 'Copied runnable fragment shader embed.'
+      : 'Copied embed with explicit fragment-only fallback.');
+  };
+
+  const handleDownloadEmbed = () => {
+    const html = buildStandaloneEmbed({
+      shaderCode: lastWorkingCode,
+      mode: pipelineMode,
+      textEffectMode,
+      scrollEffectMode,
+    });
+    downloadText(`fuzzaholic-embed-${Date.now()}.html`, html, 'text/html');
+    addLog('success', 'Downloaded standalone embed HTML.');
+  };
+
+  const handleExportBundle = async () => {
+    const [shaders, taste] = await Promise.all([getFileDbShaders(1000), getFileDbTaste()]);
+    const source = storageCapability.mode === 'local-file-db' ? 'local-file-db' : 'static-session';
+    const bundle = createFuzzaholicBundle(shaders, taste, source);
+    downloadText(bundleFilename(), JSON.stringify(bundle, null, 2));
+    addLog('success', `Exported bundle with ${shaders.length} shaders and ${taste.length} taste samples.`);
+  };
+
+  const handleImportBundleFile = async (file: File) => {
+    try {
+      const bundle = parseFuzzaholicBundle(await file.text());
+      const shaderResult = await importShadersToFileDb(bundle.shaders);
+      const tasteCount = await importTasteToFileDb(bundle.tasteSamples);
+      const [stats, taste, capability] = await Promise.all([getFileDbStats(), getFileDbTaste(), getStorageCapability()]);
+      setStorageCapability(capability);
+      setLibraryCount(stats.totalCount);
+      setTasteSamples(taste.slice(0, MAX_TASTE_SAMPLES) as TasteSample[]);
+      addLog('success', `[Import] ${shaderResult.imported} shaders imported, ${shaderResult.skipped} skipped, ${tasteCount} taste samples loaded.`);
+    } catch (error) {
+      addLog('error', `[Import] ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      if (bundleInputRef.current) bundleInputRef.current.value = '';
+    }
   };
 
   const handleLoadFromLibrary = (code: string) => {
@@ -694,6 +773,16 @@ Total Errors: ${allErrors.length}
 
   return (
     <div className="min-h-[200vh] w-screen bg-black text-white font-sans">
+      <input
+        ref={bundleInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={event => {
+          const file = event.target.files?.[0];
+          if (file) handleImportBundleFile(file);
+        }}
+      />
       <div className="sticky top-0 h-screen w-screen overflow-hidden bg-black">
         <ShaderCanvas
           shaderCode={code}
@@ -712,10 +801,13 @@ Total Errors: ${allErrors.length}
             </div>
             <div className="hidden h-7 w-px bg-white/10 sm:block" />
             <div className="hidden min-w-0 text-[10px] font-mono uppercase tracking-widest text-zinc-500 md:block">
-              {fileDbPath ? <span className="truncate">DB {fileDbPath}</span> : 'DB connecting'}
+              {storageCapability.mode === 'local-file-db' && fileDbPath ? <span className="truncate">DB {fileDbPath}</span> : storageCapability.message}
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest">
+            <span className={storageCapability.mode === 'local-file-db' ? 'text-emerald-400' : 'text-amber-300'}>
+              {storageCapability.mode === 'local-file-db' ? 'Durable' : 'Export only'}
+            </span>
             <span className={compileError ? 'text-red-400' : 'text-emerald-400'}>{compileError ? 'Compile fault' : 'Compiling'}</span>
             <span className="hidden text-zinc-600 sm:inline">Epoch {historyCount.toString().padStart(3, '0')}</span>
           </div>
@@ -799,6 +891,28 @@ Total Errors: ${allErrors.length}
                   <div className="border border-white/10 p-3"><div className="text-xl font-black">{tasteCounts.disliked}</div><div className="text-[9px] font-mono uppercase text-zinc-500">Nope</div></div>
                   <div className="border border-white/10 p-3"><div className="text-xl font-black">{tasteCounts.tooSimilar}</div><div className="text-[9px] font-mono uppercase text-zinc-500">Similar</div></div>
                 </div>
+                {latestCandidateMetrics && (
+                  <div className="border border-white/10 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Candidate scoring</span>
+                      <span className="font-mono text-xs text-emerald-300">{latestCandidateMetrics.selectedIndex + 1}/{latestCandidateMetrics.candidateCount}</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1 text-center">
+                      {[
+                        ['Novel', latestCandidateMetrics.novelty],
+                        ['Complex', latestCandidateMetrics.complexity],
+                        ['Rest', latestCandidateMetrics.restraint],
+                        ['Taste', latestCandidateMetrics.taste],
+                        ['Score', latestCandidateMetrics.score],
+                      ].map(([label, value]) => (
+                        <div key={label as string} className="bg-white/5 p-2">
+                          <div className="font-mono text-xs text-white">{Math.round((value as number) * 100)}</div>
+                          <div className="text-[8px] font-mono uppercase text-zinc-500">{label as string}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <label className="block">
                   <div className="mb-2 flex items-baseline justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Search pressure</span>
@@ -860,11 +974,17 @@ Total Errors: ${allErrors.length}
 
             {workspaceMode === 'library' && (
               <div className="space-y-4">
+                <div className={`border p-3 ${storageCapability.mode === 'local-file-db' ? 'border-emerald-400/40 text-emerald-200' : 'border-amber-400/40 text-amber-200'}`}>
+                  <div className="text-[10px] font-black uppercase tracking-widest">Storage</div>
+                  <div className="mt-1 text-xs font-mono">{storageCapability.message}</div>
+                </div>
                 <button onClick={() => setShowLibrary(true)} className="w-full bg-indigo-500 px-4 py-5 text-left text-2xl font-black uppercase leading-none text-white hover:bg-indigo-400">Open Library</button>
                 <button onClick={handleSaveShader} className="w-full border border-emerald-400 px-4 py-4 text-left text-sm font-black uppercase tracking-widest text-emerald-300 hover:bg-emerald-400 hover:text-black">Save current</button>
+                <button onClick={handleExportBundle} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Export Bundle</button>
+                <button onClick={() => bundleInputRef.current?.click()} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Import Bundle</button>
                 <div className="border border-white/10 p-4">
                   <div className="text-3xl font-black">{libraryCount}</div>
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Permanent shaders</div>
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{storageCapability.mode === 'local-file-db' ? 'Permanent shaders' : 'Session shaders'}</div>
                 </div>
               </div>
             )}
@@ -873,6 +993,8 @@ Total Errors: ${allErrors.length}
               <div className="space-y-3">
                 <button onClick={handleCopyWGSL} className="w-full bg-white px-4 py-4 text-left text-sm font-black uppercase tracking-widest text-black hover:bg-emerald-300">Copy WGSL</button>
                 <button onClick={handleCopyTextEmbed} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Copy Embed</button>
+                <button onClick={handleDownloadEmbed} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Download Embed HTML</button>
+                <button onClick={handleExportBundle} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Export Bundle</button>
                 <button onClick={() => setCodeDockOpen(open => !open)} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">
                   {codeDockOpen ? 'Hide Code Dock' : 'Open Code Dock'}
                 </button>

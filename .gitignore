@@ -15,6 +15,7 @@ data/*.sqlite
 data/*.log
 data/*.err
 data/*.pid
+visual-check-*/
 
 # Editor directories and files
 .vscode/*

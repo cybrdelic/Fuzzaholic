@@ -10,7 +10,8 @@ import {
     ShaderStats,
     StoredShader,
 } from '../services/shaderStorage';
-import { deleteFileDbShader, getFileDbShaders, getFileDbStats, updateFileDbShaderRating } from '../services/fileShaderDb';
+import { deleteFileDbShader, getFileDbShaders, getFileDbStats, getFileDbTaste, getStorageCapability, importShadersToFileDb, importTasteToFileDb, updateFileDbShaderRating } from '../services/fileShaderDb';
+import { bundleFilename, createFuzzaholicBundle, downloadText, parseFuzzaholicBundle } from '../services/shaderBundle';
 
 // ============================================================================
 // TYPES
@@ -302,6 +303,7 @@ export const ShaderLibrary: React.FC<ShaderLibraryProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState<ShaderStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const loadShaders = useCallback(async () => {
     setLoading(true);
@@ -363,14 +365,25 @@ export const ShaderLibrary: React.FC<ShaderLibraryProps> = ({
   };
 
   const handleExportAll = async () => {
-    const json = JSON.stringify(await getFileDbShaders(500), null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fuzzaholic-filedb-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const [allShaders, taste, capability] = await Promise.all([
+      getFileDbShaders(1000),
+      getFileDbTaste(),
+      getStorageCapability(),
+    ]);
+    const bundle = createFuzzaholicBundle(
+      allShaders,
+      taste,
+      capability.mode === 'local-file-db' ? 'local-file-db' : 'static-session'
+    );
+    downloadText(bundleFilename(), JSON.stringify(bundle, null, 2));
+  };
+
+  const handleImportBundle = async (file: File) => {
+    const bundle = parseFuzzaholicBundle(await file.text());
+    await importShadersToFileDb(bundle.shaders);
+    await importTasteToFileDb(bundle.tasteSamples);
+    await loadShaders();
+    if (importInputRef.current) importInputRef.current.value = '';
   };
 
   const handleLoad = (shader: StoredShader) => {
@@ -392,6 +405,16 @@ export const ShaderLibrary: React.FC<ShaderLibraryProps> = ({
         </div>
 
         <div style={styles.toolbar}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={event => {
+              const file = event.target.files?.[0];
+              if (file) handleImportBundle(file).catch(error => console.error('Bundle import failed:', error));
+            }}
+          />
           <button
             style={styles.viewButton(viewMode === 'recent')}
             onClick={() => setViewMode('recent')}
@@ -418,7 +441,10 @@ export const ShaderLibrary: React.FC<ShaderLibraryProps> = ({
             style={styles.searchInput}
           />
           <button style={styles.exportButton} onClick={handleExportAll}>
-            Export All
+            Export Bundle
+          </button>
+          <button style={styles.exportButton} onClick={() => importInputRef.current?.click()}>
+            Import Bundle
           </button>
         </div>
 
