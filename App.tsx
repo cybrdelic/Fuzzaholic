@@ -772,7 +772,7 @@ Total Errors: ${allErrors.length}
   const latestLog = logs[logs.length - 1];
 
   return (
-    <div className="min-h-[200vh] w-screen bg-black text-white font-sans">
+    <div className="scaled-ui min-h-[200vh] w-screen bg-black text-white font-sans">
       <input
         ref={bundleInputRef}
         type="file"
@@ -793,7 +793,7 @@ Total Errors: ${allErrors.length}
           onCompilationSuccess={handleCompilationSuccess}
         />
 
-        <header className="absolute left-0 right-0 top-0 z-20 flex h-14 items-center justify-between border-b border-white/10 bg-black/72 px-3 backdrop-blur md:px-5">
+        <header className="glass-bar absolute left-2 right-2 top-2 z-20 flex h-14 items-center justify-between px-3 md:left-4 md:right-4 md:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="leading-none">
               <div className="text-lg font-black tracking-tight md:text-2xl">FUZZAHOLIC</div>
@@ -817,7 +817,7 @@ Total Errors: ${allErrors.length}
           <button
             onClick={handleBackCandidate}
             disabled={candidateBackStack.length === 0}
-            className={`h-12 w-12 border text-lg font-black ${candidateBackStack.length ? 'border-white/20 bg-black/70 text-white hover:bg-white hover:text-black' : 'border-white/10 bg-black/40 text-zinc-700'}`}
+            className={`glass-button h-12 w-12 text-lg font-black ${candidateBackStack.length ? 'text-white hover:text-white' : 'text-zinc-700'}`}
             title="Back"
           >
             ←
@@ -825,7 +825,7 @@ Total Errors: ${allErrors.length}
           {candidateBackStack.slice(0, 7).map((_, index) => (
             <div
               key={index}
-              className="h-12 w-12 border border-white/10 bg-black/60 p-1"
+              className="glass-tile h-12 w-12 p-1"
               title={`Previous candidate ${index + 1}`}
             >
               <div className="h-full w-full bg-[conic-gradient(from_90deg,rgba(16,185,129,.9),rgba(59,130,246,.6),rgba(244,63,94,.7),rgba(16,185,129,.9))] opacity-70" />
@@ -836,22 +836,22 @@ Total Errors: ${allErrors.length}
           </div>
         </aside>
 
-        <main className="absolute inset-x-3 bottom-24 top-28 z-10 md:left-24 md:right-[360px] md:top-16">
-          <div className="relative h-full overflow-hidden border border-white/10 bg-black/10 shadow-[0_0_0_1px_rgba(0,0,0,0.6)]">
+        <main className="absolute inset-x-3 bottom-24 top-32 z-10 md:left-24 md:right-[360px] md:top-20">
+          <div className="glass-depth-frame relative h-full overflow-hidden bg-black/10">
             <div className="absolute left-3 top-3 z-10 flex flex-wrap gap-1">
               {pipelineButtons.map(button => (
                 <button
                   key={button.mode}
                   onClick={() => handlePipelineModeChange(button.mode)}
-                  className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${pipelineMode === button.mode ? 'bg-emerald-400 text-black' : 'bg-black/70 text-zinc-300 hover:bg-white hover:text-black'}`}
+                  className={`glass-button px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${pipelineMode === button.mode ? 'glass-active' : 'text-zinc-200'}`}
                 >
                   {button.label}
                 </button>
               ))}
             </div>
-            <div className="absolute bottom-4 left-4 z-10 max-w-[72%]">
+            <div className="absolute bottom-24 left-4 z-10 max-w-[72%] md:bottom-4">
               <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-500">Current candidate</div>
-              <div className="mt-1 text-5xl font-black leading-none text-white/80 mix-blend-screen md:text-8xl">
+              <div className="mt-1 text-4xl font-black leading-none text-white/80 mix-blend-screen md:text-8xl">
                 {historyCount.toString().padStart(3, '0')}
               </div>
             </div>
@@ -859,8 +859,8 @@ Total Errors: ${allErrors.length}
           </div>
         </main>
 
-        <aside className="absolute bottom-24 right-3 top-16 z-20 hidden w-[336px] flex-col border border-white/10 bg-black/78 backdrop-blur md:flex">
-          <nav className="grid grid-cols-2 border-b border-white/10">
+        <aside className="glass-panel-strong absolute bottom-24 right-3 top-20 z-20 hidden w-[336px] flex-col md:flex">
+          <nav className="grid grid-cols-2 border-b border-white/10 p-1">
             {modeButtons.map(button => (
               <button
                 key={button.mode}
@@ -868,7 +868,7 @@ Total Errors: ${allErrors.length}
                   setWorkspaceMode(button.mode);
                   if (button.mode === 'export') setCodeDockOpen(true);
                 }}
-                className={`px-3 py-3 text-left text-[10px] font-black uppercase tracking-widest ${workspaceMode === button.mode ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                className={`px-3 py-3 text-left text-[10px] font-black uppercase tracking-widest ${workspaceMode === button.mode ? 'glass-active' : 'text-zinc-300 hover:text-white'}`}
               >
                 {button.label}
               </button>
@@ -878,21 +878,21 @@ Total Errors: ${allErrors.length}
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {workspaceMode === 'discover' && (
               <div className="space-y-4">
-                <button onClick={handleAutoExplore} className="w-full bg-white px-4 py-5 text-left text-2xl font-black uppercase leading-none text-black hover:bg-emerald-300">
+                <button onClick={handleAutoExplore} className="glass-button-primary w-full px-4 py-5 text-left text-2xl font-black uppercase leading-none">
                   Next Candidate
                 </button>
                 <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => recordTasteAndAdvance('liked')} className="bg-emerald-500 px-3 py-4 text-sm font-black uppercase text-black hover:bg-emerald-300">Like</button>
-                  <button onClick={() => recordTasteAndAdvance('disliked')} className="bg-zinc-850 border border-white/10 px-3 py-4 text-sm font-black uppercase text-white hover:bg-white hover:text-black">Nope</button>
-                  <button onClick={() => recordTasteAndAdvance('tooSimilar')} className="bg-amber-500 px-3 py-4 text-sm font-black uppercase text-black hover:bg-amber-300">Similar</button>
+                  <button onClick={() => recordTasteAndAdvance('liked')} className="glass-button glass-good px-3 py-4 text-sm font-black uppercase">Like</button>
+                  <button onClick={() => recordTasteAndAdvance('disliked')} className="glass-button px-3 py-4 text-sm font-black uppercase text-white">Nope</button>
+                  <button onClick={() => recordTasteAndAdvance('tooSimilar')} className="glass-button glass-danger px-3 py-4 text-sm font-black uppercase">Similar</button>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="border border-white/10 p-3"><div className="text-xl font-black">{tasteCounts.liked}</div><div className="text-[9px] font-mono uppercase text-zinc-500">Liked</div></div>
-                  <div className="border border-white/10 p-3"><div className="text-xl font-black">{tasteCounts.disliked}</div><div className="text-[9px] font-mono uppercase text-zinc-500">Nope</div></div>
-                  <div className="border border-white/10 p-3"><div className="text-xl font-black">{tasteCounts.tooSimilar}</div><div className="text-[9px] font-mono uppercase text-zinc-500">Similar</div></div>
+                  <div className="glass-tile p-3"><div className="text-xl font-black">{tasteCounts.liked}</div><div className="text-[9px] font-mono uppercase text-zinc-400">Liked</div></div>
+                  <div className="glass-tile p-3"><div className="text-xl font-black">{tasteCounts.disliked}</div><div className="text-[9px] font-mono uppercase text-zinc-400">Nope</div></div>
+                  <div className="glass-tile p-3"><div className="text-xl font-black">{tasteCounts.tooSimilar}</div><div className="text-[9px] font-mono uppercase text-zinc-400">Similar</div></div>
                 </div>
                 {latestCandidateMetrics && (
-                  <div className="border border-white/10 p-3">
+                  <div className="glass-panel p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Candidate scoring</span>
                       <span className="font-mono text-xs text-emerald-300">{latestCandidateMetrics.selectedIndex + 1}/{latestCandidateMetrics.candidateCount}</span>
@@ -905,7 +905,7 @@ Total Errors: ${allErrors.length}
                         ['Taste', latestCandidateMetrics.taste],
                         ['Score', latestCandidateMetrics.score],
                       ].map(([label, value]) => (
-                        <div key={label as string} className="bg-white/5 p-2">
+                        <div key={label as string} className="glass-tile p-2">
                           <div className="font-mono text-xs text-white">{Math.round((value as number) * 100)}</div>
                           <div className="text-[8px] font-mono uppercase text-zinc-500">{label as string}</div>
                         </div>
@@ -940,9 +940,9 @@ Total Errors: ${allErrors.length}
                       <button
                         key={effect.mode}
                         onClick={() => setTextEffectMode(effect.mode)}
-                        className={`relative h-24 overflow-hidden border p-3 text-left ${textEffectMode === effect.mode ? 'border-white bg-white text-black' : 'border-white/10 bg-zinc-950/80 text-white hover:border-emerald-400'}`}
+                        className={`glass-tile relative h-24 overflow-hidden p-3 text-left ${textEffectMode === effect.mode ? 'glass-active' : 'text-white'}`}
                       >
-                        <div className="absolute inset-x-3 top-4 h-7 bg-[linear-gradient(90deg,rgba(16,185,129,.45),rgba(255,255,255,.18),rgba(59,130,246,.45))]" />
+                        <div className="absolute inset-x-3 top-4 h-7 border border-white/20 bg-[linear-gradient(90deg,rgba(16,185,129,.45),rgba(255,255,255,.18),rgba(59,130,246,.45))] shadow-[inset_0_1px_0_rgba(255,255,255,.28)]" />
                         {effect.mode === 'extrude' && <div className="absolute inset-x-5 top-8 h-7 translate-x-2 translate-y-2 bg-white/15" />}
                         {effect.mode === 'scan' && <div className="absolute inset-x-3 top-11 h-px bg-white shadow-[0_8px_0_rgba(255,255,255,.45),0_16px_0_rgba(255,255,255,.25)]" />}
                         <span className="absolute bottom-3 left-3 text-xs font-black uppercase tracking-widest">{effect.label}</span>
@@ -957,7 +957,7 @@ Total Errors: ${allErrors.length}
                       <button
                         key={effect.mode}
                         onClick={() => setScrollEffectMode(effect.mode)}
-                        className={`flex w-full items-center justify-between border px-3 py-3 text-left ${scrollEffectMode === effect.mode ? 'border-white bg-white text-black' : 'border-white/10 bg-zinc-950/80 text-white hover:border-emerald-400'}`}
+                        className={`glass-button flex w-full items-center justify-between px-3 py-3 text-left ${scrollEffectMode === effect.mode ? 'glass-active' : 'text-white'}`}
                       >
                         <span className="text-xs font-black uppercase tracking-widest">{effect.label}</span>
                         <span className="h-8 w-14 border border-current opacity-40" />
@@ -966,23 +966,23 @@ Total Errors: ${allErrors.length}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={handleCursorFuzz} className="border border-white/10 bg-black px-3 py-3 text-xs font-black uppercase tracking-widest hover:bg-white hover:text-black">Cursor edit</button>
-                  <button onClick={handleScrollFuzz} className="border border-white/10 bg-black px-3 py-3 text-xs font-black uppercase tracking-widest hover:bg-white hover:text-black">Scroll edit</button>
+                  <button onClick={handleCursorFuzz} className="glass-button px-3 py-3 text-xs font-black uppercase tracking-widest text-white">Cursor edit</button>
+                  <button onClick={handleScrollFuzz} className="glass-button px-3 py-3 text-xs font-black uppercase tracking-widest text-white">Scroll edit</button>
                 </div>
               </div>
             )}
 
             {workspaceMode === 'library' && (
               <div className="space-y-4">
-                <div className={`border p-3 ${storageCapability.mode === 'local-file-db' ? 'border-emerald-400/40 text-emerald-200' : 'border-amber-400/40 text-amber-200'}`}>
+                  <div className={`glass-panel p-3 ${storageCapability.mode === 'local-file-db' ? 'text-emerald-200' : 'text-amber-200'}`}>
                   <div className="text-[10px] font-black uppercase tracking-widest">Storage</div>
                   <div className="mt-1 text-xs font-mono">{storageCapability.message}</div>
                 </div>
-                <button onClick={() => setShowLibrary(true)} className="w-full bg-indigo-500 px-4 py-5 text-left text-2xl font-black uppercase leading-none text-white hover:bg-indigo-400">Open Library</button>
-                <button onClick={handleSaveShader} className="w-full border border-emerald-400 px-4 py-4 text-left text-sm font-black uppercase tracking-widest text-emerald-300 hover:bg-emerald-400 hover:text-black">Save current</button>
-                <button onClick={handleExportBundle} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Export Bundle</button>
-                <button onClick={() => bundleInputRef.current?.click()} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Import Bundle</button>
-                <div className="border border-white/10 p-4">
+                <button onClick={() => setShowLibrary(true)} className="glass-button-primary w-full px-4 py-5 text-left text-2xl font-black uppercase leading-none">Open Library</button>
+                <button onClick={handleSaveShader} className="glass-button glass-good w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Save current</button>
+                <button onClick={handleExportBundle} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Export Bundle</button>
+                <button onClick={() => bundleInputRef.current?.click()} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Import Bundle</button>
+                <div className="glass-tile p-4">
                   <div className="text-3xl font-black">{libraryCount}</div>
                   <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{storageCapability.mode === 'local-file-db' ? 'Permanent shaders' : 'Session shaders'}</div>
                 </div>
@@ -991,11 +991,11 @@ Total Errors: ${allErrors.length}
 
             {workspaceMode === 'export' && (
               <div className="space-y-3">
-                <button onClick={handleCopyWGSL} className="w-full bg-white px-4 py-4 text-left text-sm font-black uppercase tracking-widest text-black hover:bg-emerald-300">Copy WGSL</button>
-                <button onClick={handleCopyTextEmbed} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Copy Embed</button>
-                <button onClick={handleDownloadEmbed} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Download Embed HTML</button>
-                <button onClick={handleExportBundle} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">Export Bundle</button>
-                <button onClick={() => setCodeDockOpen(open => !open)} className="w-full border border-white/10 px-4 py-4 text-left text-sm font-black uppercase tracking-widest hover:bg-white hover:text-black">
+                <button onClick={handleCopyWGSL} className="glass-button-primary w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Copy WGSL</button>
+                <button onClick={handleCopyTextEmbed} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Copy Embed</button>
+                <button onClick={handleDownloadEmbed} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Download Embed HTML</button>
+                <button onClick={handleExportBundle} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">Export Bundle</button>
+                <button onClick={() => setCodeDockOpen(open => !open)} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest">
                   {codeDockOpen ? 'Hide Code Dock' : 'Open Code Dock'}
                 </button>
                 <button onClick={handleCopyAllErrors} disabled={allErrors.length === 0} className={`w-full border px-4 py-4 text-left text-sm font-black uppercase tracking-widest ${allErrors.length ? 'border-red-500 text-red-300 hover:bg-red-500 hover:text-black' : 'border-white/10 text-zinc-700'}`}>
@@ -1010,15 +1010,15 @@ Total Errors: ${allErrors.length}
           </div>
         </aside>
 
-        <section className="absolute inset-x-3 bottom-3 z-30 border border-white/10 bg-black/82 p-2 backdrop-blur md:left-24 md:right-[360px]">
+        <section className="glass-bar absolute inset-x-3 bottom-3 z-30 p-2 md:left-24 md:right-[360px]">
           <div className="grid grid-cols-4 gap-2 md:grid-cols-8">
-            <button onClick={handleBackCandidate} disabled={candidateBackStack.length === 0} className={`px-3 py-3 text-xs font-black uppercase tracking-widest ${candidateBackStack.length ? 'bg-zinc-900 text-white hover:bg-white hover:text-black' : 'bg-zinc-950 text-zinc-700'}`}>Back</button>
-            <button onClick={handleAutoExplore} className="col-span-2 bg-white px-3 py-3 text-xs font-black uppercase tracking-widest text-black hover:bg-emerald-300 md:col-span-2">Next</button>
-            <button onClick={() => recordTasteAndAdvance('liked')} className="bg-emerald-400 px-3 py-3 text-xs font-black uppercase tracking-widest text-black hover:bg-emerald-300">Like</button>
-            <button onClick={() => recordTasteAndAdvance('disliked')} className="bg-zinc-800 px-3 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-white hover:text-black">Nope</button>
-            <button onClick={() => recordTasteAndAdvance('tooSimilar')} className="bg-amber-400 px-3 py-3 text-xs font-black uppercase tracking-widest text-black hover:bg-amber-300">Similar</button>
-            <button onClick={handleSaveShader} className="bg-indigo-500 px-3 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-indigo-400">Save</button>
-            <button onClick={() => { setWorkspaceMode('effects'); setTextEffectMode(textEffectMode === 'none' ? 'poster' : textEffectMode); }} className="bg-zinc-900 px-3 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-white hover:text-black">Text</button>
+            <button onClick={handleBackCandidate} disabled={candidateBackStack.length === 0} className={`glass-button px-3 py-3 text-xs font-black uppercase tracking-widest ${candidateBackStack.length ? 'text-white' : 'text-zinc-700'}`}>Back</button>
+            <button onClick={handleAutoExplore} className="glass-button-primary col-span-2 px-3 py-3 text-xs font-black uppercase tracking-widest md:col-span-2">Next</button>
+            <button onClick={() => recordTasteAndAdvance('liked')} className="glass-button glass-good px-3 py-3 text-xs font-black uppercase tracking-widest">Like</button>
+            <button onClick={() => recordTasteAndAdvance('disliked')} className="glass-button px-3 py-3 text-xs font-black uppercase tracking-widest text-white">Nope</button>
+            <button onClick={() => recordTasteAndAdvance('tooSimilar')} className="glass-button glass-danger px-3 py-3 text-xs font-black uppercase tracking-widest">Similar</button>
+            <button onClick={handleSaveShader} className="glass-button px-3 py-3 text-xs font-black uppercase tracking-widest text-white">Save</button>
+            <button onClick={() => { setWorkspaceMode('effects'); setTextEffectMode(textEffectMode === 'none' ? 'poster' : textEffectMode); }} className="glass-button px-3 py-3 text-xs font-black uppercase tracking-widest text-white">Text</button>
           </div>
           {latestLog && (
             <div className="mt-2 truncate text-[10px] font-mono uppercase tracking-widest text-zinc-500">
@@ -1027,7 +1027,7 @@ Total Errors: ${allErrors.length}
           )}
         </section>
 
-        <div className="absolute left-3 right-3 top-16 z-30 grid grid-cols-4 gap-1 md:hidden">
+        <div className="glass-bar absolute left-3 right-3 top-20 z-30 grid grid-cols-4 gap-1 p-1 md:hidden">
           {modeButtons.map(button => (
             <button
               key={button.mode}
@@ -1035,7 +1035,7 @@ Total Errors: ${allErrors.length}
                 setWorkspaceMode(button.mode);
                 if (button.mode === 'export') setCodeDockOpen(true);
               }}
-              className={`px-2 py-2 text-[9px] font-black uppercase tracking-widest ${workspaceMode === button.mode ? 'bg-white text-black' : 'bg-black/80 text-white'}`}
+              className={`px-2 py-2 text-[9px] font-black uppercase tracking-widest ${workspaceMode === button.mode ? 'glass-active' : 'text-white'}`}
             >
               {button.label.split(' ')[0]}
             </button>
@@ -1043,7 +1043,7 @@ Total Errors: ${allErrors.length}
         </div>
 
         {codeDockOpen && (
-          <div className="absolute inset-x-3 bottom-[118px] z-40 h-[42vh] border border-white/10 bg-black shadow-2xl md:left-24 md:right-[360px]">
+          <div className="glass-panel-strong absolute inset-x-3 bottom-[118px] z-40 h-[42vh] shadow-2xl md:left-24 md:right-[360px]">
             <div className="flex h-9 items-center justify-between border-b border-white/10 px-3">
               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">WGSL Dock</span>
               <button onClick={() => setCodeDockOpen(false)} className="text-xs font-black uppercase tracking-widest text-zinc-400 hover:text-white">Close</button>
