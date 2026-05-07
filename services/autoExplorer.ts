@@ -55,7 +55,18 @@ export async function generateAutoExplorationCandidate(
     const restraint = restraintScore(code, features);
     const taste = tasteScore(features, liked, disliked, tooSimilar);
     const repetitionPenalty = repetitionScore(code);
-    const score = novelty * 0.43 + complexity * 0.18 + restraint * 0.22 + taste * 0.32 - repetitionPenalty * 0.2;
+    const amateurPenalty = amateurPenaltyScore(code, features);
+    const qualityGate = acceptanceGate(code, novelty, complexity, restraint, amateurPenalty);
+    if (qualityGate <= 0) continue;
+    const score = (
+      novelty * 0.42
+      + complexity * 0.22
+      + restraint * 0.26
+      + taste * 0.26
+      + qualityGate * 0.18
+      - repetitionPenalty * 0.24
+      - amateurPenalty * 0.34
+    );
 
     if (!best || score > best.score) {
       best = {
@@ -73,7 +84,18 @@ export async function generateAutoExplorationCandidate(
   }
 
   if (!best) {
-    throw new Error('Auto explorer produced no candidates');
+    const fallbackCode = generateFreshShaderV2WithMode(clamp01(options.intensity * 0.7 + 0.2), seed + 99991, options.mode);
+    return {
+      code: fallbackCode,
+      seed: seed + 99991,
+      selectedIndex: 0,
+      candidateCount,
+      score: 0,
+      novelty: 0,
+      complexity: complexityScore(fallbackCode, extractFeatures(fallbackCode)),
+      restraint: restraintScore(fallbackCode, extractFeatures(fallbackCode)),
+      taste: 0,
+    };
   }
 
   return best;
@@ -145,7 +167,9 @@ function complexityScore(code: string, features: FeatureVector): number {
   const swizzleKinds = [...features.keys()].filter(key => key.startsWith('swizzle:')).length;
   const lineCount = code.split('\n').filter(line => line.trim().length > 0).length;
   const lineBalance = bell(lineCount, 72, 58);
-  return clamp01(callKinds / 22 * 0.45 + swizzleKinds / 14 * 0.2 + lineBalance * 0.35);
+  const materialSignals = ['f_pal', 'mix', 'smoothstep', 'atan2', 'f_rot', 'dot', 'length']
+    .filter(term => code.includes(term)).length;
+  return clamp01(callKinds / 24 * 0.36 + swizzleKinds / 14 * 0.16 + lineBalance * 0.28 + materialSignals / 7 * 0.2);
 }
 
 function restraintScore(code: string, features: FeatureVector): number {
@@ -155,6 +179,44 @@ function restraintScore(code: string, features: FeatureVector): number {
   const vocabularyBalance = bell(calls + literals * 0.25, 18, 14);
   const hardClipPenalty = (code.match(/clamp|step|floor|fract/g) ?? []).length / 42;
   return clamp01(lengthBalance * 0.48 + vocabularyBalance * 0.42 + (1 - clamp01(hardClipPenalty)) * 0.1);
+}
+
+function acceptanceGate(
+  code: string,
+  novelty: number,
+  complexity: number,
+  restraint: number,
+  amateurPenalty: number
+): number {
+  const hasSpatialMaterial = /f_rot|atan2|dot|length|smoothstep|mix/.test(code);
+  const hasPaletteWork = /f_pal|vec3<f32>\([^)]*,[^)]*,[^)]*\)/.test(code);
+  const tooShort = code.length < 1800;
+  if (tooShort || !hasSpatialMaterial || !hasPaletteWork) return 0;
+  if (complexity < 0.34 || restraint < 0.28 || novelty < 0.035) return 0;
+  if (amateurPenalty > 0.74) return 0;
+  return clamp01((complexity * 0.42 + restraint * 0.42 + novelty * 0.16) * (1 - amateurPenalty * 0.55));
+}
+
+function amateurPenaltyScore(code: string, features: FeatureVector): number {
+  const count = (term: string) => code.match(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length ?? 0;
+  const lineCount = code.split('\n').filter(line => line.trim()).length;
+  const calls = [...features.keys()].filter(key => key.startsWith('call:')).length;
+  const hardSteps = count('step') + count('floor') + count('fract');
+  const trigSpam = count('sin') + count('cos');
+  const paletteRepeat = Math.max(0, count('f_pal') - 5);
+  const lengthPenalty = code.length > 8200 ? (code.length - 8200) / 5000 : 0;
+  const shortPenalty = code.length < 2200 ? (2200 - code.length) / 2200 : 0;
+  const linePenalty = lineCount > 135 ? (lineCount - 135) / 80 : 0;
+  const callPenalty = calls > 30 ? (calls - 30) / 26 : 0;
+  return clamp01(
+    hardSteps / 44 * 0.24
+    + trigSpam / 62 * 0.18
+    + paletteRepeat * 0.06
+    + lengthPenalty * 0.22
+    + shortPenalty * 0.28
+    + linePenalty * 0.18
+    + callPenalty * 0.16
+  );
 }
 
 function repetitionScore(code: string): number {

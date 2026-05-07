@@ -31,52 +31,60 @@ const TEXT_COMPOSITE_FRAGMENT_SHADER = `
 @group(0) @binding(4) var<uniform> scroll : vec2<f32>;
 
 fn mask_at(uv: vec2<f32>) -> f32 {
-  let textUv = vec2<f32>(uv.x, 1.0 - uv.y);
-  return textureSample(textMaskTexture, fillSampler, textUv).r;
+  return textureSample(textMaskTexture, fillSampler, uv).r;
+}
+
+fn guide_at(uv: vec2<f32>) -> vec4<f32> {
+  return textureSample(textMaskTexture, fillSampler, uv);
 }
 
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let px = vec2<f32>(0.00145, 0.00145);
-  let text = mask_at(uv);
+  let mask = guide_at(uv);
+  let text = mask.r;
+  let scaffold = mask.g;
+  let incision = mask.b;
   let mx1 = mask_at(uv + vec2<f32>(px.x, 0.0));
   let mx2 = mask_at(uv - vec2<f32>(px.x, 0.0));
   let my1 = mask_at(uv + vec2<f32>(0.0, px.y));
   let my2 = mask_at(uv - vec2<f32>(0.0, px.y));
   let grad = vec2<f32>(mx1 - mx2, my1 - my2);
-  let edge = clamp(length(grad) * 3.2, 0.0, 1.0);
+  let edge = clamp(length(grad) * 4.2, 0.0, 1.0);
 
-  let outer1 = mask_at(uv + vec2<f32>(0.010, -0.010));
-  let outer2 = mask_at(uv + vec2<f32>(0.022, -0.020));
-  let shadow = clamp((text - outer1) * 0.9 + (text - outer2) * 0.55, 0.0, 1.0);
-  let halo = clamp(edge + (mask_at(uv + vec2<f32>(0.006, 0.006)) - text) * 0.6, 0.0, 1.0);
+  let grow = smoothstep(-0.24, 0.72, sin(uv.x * 8.0 + uv.y * 3.0 + time * 0.9) + scroll.y * 1.8);
+  let contourGate = smoothstep(0.18, 0.94, fract((uv.x + uv.y * 0.47) * 18.0 - time * 0.55));
+  let built = clamp(text * grow + scaffold * 0.55 + incision * contourGate * 0.5, 0.0, 1.0);
+  let outer = clamp(mask_at(uv + vec2<f32>(0.014, -0.012)) + mask_at(uv + vec2<f32>(-0.012, 0.014)), 0.0, 1.0);
+  let halo = clamp((outer - text) * 0.48 + edge * 0.28 + scaffold * 0.32, 0.0, 1.0);
 
   let flow = vec2<f32>(
-    sin(time * 0.9 + uv.y * 23.0 + edge * 6.0),
-    cos(time * 1.1 + uv.x * 19.0 - edge * 5.0)
+    sin(time * 0.72 + uv.y * 31.0 + incision * 9.0),
+    cos(time * 0.86 + uv.x * 27.0 - scaffold * 7.0)
   );
   let bevelDir = normalize(grad + vec2<f32>(0.0001, -0.0001));
-  let warp = bevelDir * (0.020 * edge + 0.006 * text) + flow * (0.004 + 0.010 * edge);
-  let carvedUv = uv + warp;
-  let refractedUv = uv - warp * (1.4 + scroll.y * 0.8);
+  let warp = bevelDir * (0.028 * edge + 0.012 * built) + flow * (0.004 + 0.014 * scaffold);
+  let carvedUv = uv + warp * (0.5 + built);
+  let refractedUv = uv - warp * (1.2 + scroll.y * 0.8);
 
   let core = textureSample(shaderTexture, fillSampler, carvedUv).rgb;
-  let under = textureSample(shaderTexture, fillSampler, uv + flow * 0.018).rgb;
+  let under = textureSample(shaderTexture, fillSampler, uv + flow * 0.025).rgb;
   let r = textureSample(shaderTexture, fillSampler, refractedUv + vec2<f32>(0.008, -0.003)).r;
   let g = textureSample(shaderTexture, fillSampler, carvedUv).g;
   let b = textureSample(shaderTexture, fillSampler, refractedUv - vec2<f32>(0.007, 0.004)).b;
   let chroma = vec3<f32>(r, g, b);
 
-  let contour = sin((text + edge * 0.72 + dot(uv, vec2<f32>(1.7, -1.1))) * 42.0 + time * 3.2);
-  let scan = smoothstep(0.82, 1.0, sin((uv.y + scroll.y * 0.9) * 95.0 + time * 5.0) * 0.5 + 0.5);
+  let sourceEnergy = clamp(dot(core, vec3<f32>(0.299, 0.587, 0.114)), 0.0, 1.0);
+  let contour = smoothstep(0.54, 0.98, sin((text + edge * 0.9 + sourceEnergy + dot(uv, vec2<f32>(2.3, -1.4))) * 38.0 + time * 2.1) * 0.5 + 0.5);
+  let scan = smoothstep(0.82, 1.0, sin((uv.y + scroll.y * 0.9) * 105.0 + time * 4.4 + sourceEnergy * 5.0) * 0.5 + 0.5);
   let bevelLight = clamp(dot(normalize(vec2<f32>(-0.45, 0.9)), bevelDir) * 0.5 + 0.5, 0.0, 1.0);
-  let glyph = mix(core, chroma, 0.52 + 0.22 * scan);
-  let embossed = glyph * (0.62 + 0.55 * bevelLight) + vec3<f32>(edge * 0.42 + scan * edge * 0.28);
-  let engraved = mix(under * 0.08, under * (0.28 + 0.25 * contour), shadow);
-  let aura = vec3<f32>(0.08, 0.18, 0.16) * halo + chroma * halo * 0.18;
-  let ink = under * 0.035 + aura;
-  let alpha = clamp(text + edge * 0.95 + halo * 0.36, 0.0, 1.0);
-  return vec4<f32>(mix(ink + engraved, embossed, alpha), 1.0);
+  let material = mix(core * core * 1.55, chroma, 0.34 + contour * 0.28 + scan * 0.16);
+  let vein = vec3<f32>(contour * incision, scan * edge, scaffold * sourceEnergy) * (0.42 + sourceEnergy);
+  let builtGlyph = material * (0.42 + 0.82 * bevelLight) + vein + edge * vec3<f32>(0.42, 0.48, 0.52);
+  let substrate = under * (0.025 + 0.10 * halo) + chroma * halo * 0.16;
+  let construction = vec3<f32>(0.18, 0.92, 0.72) * scaffold * (0.18 + 0.42 * scan);
+  let alpha = clamp(built + edge * 0.8 + halo * 0.42, 0.0, 1.0);
+  return vec4<f32>(mix(substrate + construction, builtGlyph, alpha), 1.0);
 }
 `;
 
@@ -151,28 +159,52 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
     const ctx = maskCanvas.getContext('2d');
     if (!ctx) return null;
 
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = 'rgb(0,0,0)';
     ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    if (textMode === 'poster') {
-      ctx.font = '900 270px Arial Black, Impact, sans-serif';
-      ctx.fillText('FUZZ', 600, 520);
-      ctx.font = '900 190px Arial Black, Impact, sans-serif';
-      ctx.fillText('AHOLIC', 600, 750);
-    } else if (textMode === 'extrude') {
-      ctx.font = '900 210px Arial Black, Impact, sans-serif';
-      ctx.fillText('FUZZAHOLIC', 600, 632);
-      ctx.font = '900 82px Arial Black, Impact, sans-serif';
-      ctx.fillText('SHADER LAB', 604, 770);
-    } else {
-      ctx.font = '900 155px Arial Black, Impact, sans-serif';
-      ctx.fillText('FUZZAHOLIC', 600, 620);
-      ctx.font = '900 58px Arial Black, Impact, sans-serif';
-      ctx.fillText('LIVE TEXTURE TYPE', 600, 720);
+    const drawLayer = (color: string, offsetX = 0, offsetY = 0, stroke = 0) => {
+      ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = stroke || 1;
+      if (textMode === 'poster') {
+        ctx.font = '900 270px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('FUZZ', 600 + offsetX, 520 + offsetY);
+        ctx.fillText('FUZZ', 600 + offsetX, 520 + offsetY);
+        ctx.font = '900 190px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('AHOLIC', 600 + offsetX, 750 + offsetY);
+        ctx.fillText('AHOLIC', 600 + offsetX, 750 + offsetY);
+      } else if (textMode === 'extrude') {
+        ctx.font = '900 210px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 632 + offsetY);
+        ctx.fillText('FUZZAHOLIC', 600 + offsetX, 632 + offsetY);
+        ctx.font = '900 82px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('SHADER LAB', 604 + offsetX, 770 + offsetY);
+        ctx.fillText('SHADER LAB', 604 + offsetX, 770 + offsetY);
+      } else {
+        ctx.font = '900 155px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 620 + offsetY);
+        ctx.fillText('FUZZAHOLIC', 600 + offsetX, 620 + offsetY);
+        ctx.font = '900 58px Arial Black, Impact, sans-serif';
+        if (stroke) ctx.strokeText('LIVE TEXTURE TYPE', 600 + offsetX, 720 + offsetY);
+        ctx.fillText('LIVE TEXTURE TYPE', 600 + offsetX, 720 + offsetY);
+      }
+    };
+
+    drawLayer('rgb(0,72,0)', 10, -10, 18);
+    drawLayer('rgb(0,0,76)', -7, 7, textMode === 'scan' ? 10 : 4);
+    ctx.strokeStyle = 'rgb(0,0,96)';
+    ctx.lineWidth = textMode === 'extrude' ? 10 : 6;
+    for (let y = 420; y < 810; y += textMode === 'scan' ? 22 : 38) {
+      ctx.beginPath();
+      ctx.moveTo(210, y);
+      ctx.lineTo(990, y + Math.sin(y * 0.02) * 18);
+      ctx.stroke();
     }
+    drawLayer('rgb(255,0,0)');
 
     const texture = device.createTexture({
       size: [size, size],
