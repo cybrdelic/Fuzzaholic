@@ -35,6 +35,142 @@
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
+      :root {
+        --glass-bg: rgba(8, 10, 12, 0.68);
+        --glass-bg-strong: rgba(8, 10, 12, 0.82);
+        --glass-line: rgba(255, 255, 255, 0.16);
+        --glass-line-soft: rgba(255, 255, 255, 0.07);
+        --glass-highlight: rgba(255, 255, 255, 0.38);
+        --glass-shadow: rgba(0, 0, 0, 0.62);
+        --panel-scale: clamp(0.86rem, 0.72rem + 0.35vw, 1rem);
+      }
+      .glass-panel,
+      .glass-panel-strong,
+      .glass-bar,
+      .glass-button,
+      .glass-button-primary,
+      .glass-tile {
+        position: relative;
+        isolation: isolate;
+        border: 1px solid var(--glass-line);
+        background:
+          linear-gradient(135deg, rgba(255,255,255,0.13), rgba(255,255,255,0.03) 28%, rgba(0,0,0,0.18) 78%),
+          var(--glass-bg);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,0.28),
+          inset 0 -1px 0 rgba(255,255,255,0.05),
+          0 14px 36px var(--glass-shadow);
+        backdrop-filter: blur(18px) saturate(1.32);
+        -webkit-backdrop-filter: blur(18px) saturate(1.32);
+      }
+      .glass-panel-strong,
+      .glass-bar {
+        background:
+          linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.035) 32%, rgba(0,0,0,0.28) 82%),
+          var(--glass-bg-strong);
+      }
+      .glass-panel::before,
+      .glass-panel-strong::before,
+      .glass-bar::before,
+      .glass-button::before,
+      .glass-button-primary::before,
+      .glass-tile::before {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        pointer-events: none;
+        border: 1px solid var(--glass-line-soft);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.42);
+        z-index: -1;
+      }
+      .glass-panel::after,
+      .glass-panel-strong::after,
+      .glass-bar::after,
+      .glass-tile::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent) top left / 100% 1px no-repeat,
+          linear-gradient(180deg, rgba(255,255,255,0.11), transparent 34%);
+        opacity: 0.75;
+        z-index: -1;
+      }
+      .glass-button,
+      .glass-button-primary {
+        min-height: 2.75rem;
+        transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+      }
+      .glass-button:hover,
+      .glass-button-primary:hover {
+        border-color: rgba(255,255,255,0.42);
+        transform: translateY(-1px);
+      }
+      .glass-button-primary {
+        color: #050505;
+        background:
+          linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.42)),
+          linear-gradient(90deg, #6ee7b7, #ffffff);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,0.75),
+          inset 0 -1px 0 rgba(0,0,0,0.12),
+          0 12px 34px rgba(16,185,129,0.18);
+      }
+      .glass-active {
+        color: #050505 !important;
+        background:
+          linear-gradient(135deg, rgba(255,255,255,0.82), rgba(255,255,255,0.48)),
+          linear-gradient(90deg, #6ee7b7, #ffffff) !important;
+        border-color: rgba(255,255,255,0.7) !important;
+      }
+      .glass-danger {
+        background:
+          linear-gradient(135deg, rgba(251,191,36,0.55), rgba(255,255,255,0.12)),
+          rgba(32, 20, 4, 0.72);
+        border-color: rgba(251,191,36,0.58);
+        color: #fff7d6;
+      }
+      .glass-good {
+        background:
+          linear-gradient(135deg, rgba(52,211,153,0.56), rgba(255,255,255,0.10)),
+          rgba(4, 28, 20, 0.72);
+        border-color: rgba(52,211,153,0.58);
+        color: #dcfff2;
+      }
+      .glass-depth-frame {
+        position: relative;
+        border: 1px solid rgba(255,255,255,0.15);
+        box-shadow:
+          0 0 0 1px rgba(0,0,0,0.75),
+          0 0 0 3px rgba(255,255,255,0.035),
+          inset 0 0 0 1px rgba(255,255,255,0.055),
+          0 22px 70px rgba(0,0,0,0.72);
+      }
+      .glass-depth-frame::before,
+      .glass-depth-frame::after {
+        content: "";
+        position: absolute;
+        pointer-events: none;
+        inset: 8px;
+        border: 1px solid rgba(255,255,255,0.045);
+      }
+      .glass-depth-frame::after {
+        inset: 15px;
+        border-color: rgba(0,0,0,0.5);
+      }
+      .scaled-ui {
+        font-size: var(--panel-scale);
+      }
+      @media (max-width: 767px) {
+        :root {
+          --panel-scale: 0.88rem;
+        }
+        .glass-bar {
+          backdrop-filter: blur(14px) saturate(1.22);
+          -webkit-backdrop-filter: blur(14px) saturate(1.22);
+        }
+      }
     </style>
   <script type="importmap">
 {
