@@ -4,6 +4,16 @@ export interface LogEntry {
   timestamp: Date;
   type: 'info' | 'success' | 'error' | 'warning';
   message: string;
+  shaderCode?: string; // Optional: store shader code that caused error
+}
+
+export interface CompilationError {
+  epoch: number;
+  timestamp: Date;
+  error: string;
+  shaderCodeBefore: string;  // Original shader BEFORE mutation
+  shaderCodeAfter: string;   // Resulting shader AFTER mutation (the one that failed)
+  mutationType?: string;     // Which mutation button was clicked
 }
 
 export interface FuzzConfig {
@@ -23,3 +33,9 @@ export interface ShaderPreset {
   name: PresetName;
   code: string;
 }
+
+export type FuzzMode = 'fragment' | 'vertex-fragment' | 'compute';
+
+export type TextEffectMode = 'none' | 'poster' | 'extrude' | 'scan';
+
+export type ScrollEffectMode = 'none' | 'viewportExpand' | 'backgroundReveal';
