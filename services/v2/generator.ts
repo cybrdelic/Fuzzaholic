@@ -768,6 +768,12 @@ export class ShaderGenerator {
     const lightDir = B.call('normalize', B.vec3(B.lit(-0.42), B.lit(0.58), B.lit(0.70)));
     const viewDir = B.vec3(B.lit(0.0), B.lit(0.0), B.lit(1.0));
     const ndotl = B.call('clamp', B.call('dot', normal, lightDir), B.lit(0.08), B.lit(1.0));
+    const halfDir = B.call('normalize', B.binary(lightDir, '+', viewDir));
+    const specular = B.binary(
+      B.call('pow', B.call('clamp', B.call('dot', normal, halfDir), B.lit(0.0), B.lit(1.0)), B.lit(28.0)),
+      '*',
+      B.lit(0.16)
+    );
     const fresnel = B.call(
       'pow',
       B.binary(B.lit(1.0), '-', B.call('clamp', B.call('dot', normal, viewDir), B.lit(0.0), B.lit(1.0))),
@@ -779,15 +785,44 @@ export class ShaderGenerator {
       B.lit(0.55),
       B.lit(1.0)
     );
-    const diffuse = B.binary(color, '*', B.vec3(B.binary(B.lit(0.38), '+', B.binary(ndotl, '*', B.lit(0.72)))));
+    const skyBounce = B.call(
+      'mix',
+      B.vec3(B.lit(0.05), B.lit(0.06), B.lit(0.08)),
+      B.binary(B.member(color, 'yzx'), '*', B.vec3(B.lit(0.32))),
+      B.call('clamp', B.binary(B.binary(B.member(normal, 'y'), '*', B.lit(0.5)), '+', B.lit(0.5)), B.lit(0.0), B.lit(1.0))
+    );
+    const groundBounce = B.binary(
+      B.member(color, 'zxy'),
+      '*',
+      B.vec3(B.call('clamp', B.binary(B.lit(0.45), '-', B.binary(B.member(normal, 'y'), '*', B.lit(0.35))), B.lit(0.0), B.lit(0.32)))
+    );
+    const gi = B.binary(skyBounce, '+', groundBounce);
+    const diffuse = B.binary(color, '*', B.vec3(B.binary(B.lit(0.30), '+', B.binary(ndotl, '*', B.lit(0.74)))));
     const rim = B.binary(B.member(color, 'zyx'), '*', B.vec3(B.binary(fresnel, '*', B.lit(0.16))));
-    const lit = B.binary(B.binary(diffuse, '+', rim), '*', B.vec3(ao));
+    const lit = B.binary(
+      B.binary(B.binary(B.binary(diffuse, '+', gi), '+', rim), '+', B.vec3(specular)),
+      '*',
+      B.vec3(ao)
+    );
+    const luma = B.call('dot', lit, B.vec3(B.lit(0.2126), B.lit(0.7152), B.lit(0.0722)));
+    const bloom = B.call('smoothstep', B.lit(0.58), B.lit(1.12), luma);
+    const focusDepth = B.call('smoothstep', B.lit(0.16), B.lit(1.18), B.call('length', centered));
+    const dofSoft = B.call(
+      'mix',
+      lit,
+      B.binary(B.vec3(luma), '+', B.binary(B.member(color, 'yzx'), '*', B.vec3(B.lit(0.18)))),
+      B.binary(focusDepth, '*', B.lit(0.18))
+    );
     const vignette = B.binary(
       B.lit(1.0),
       '-',
       B.binary(B.call('smoothstep', B.lit(0.28), B.lit(1.42), B.call('length', centered)), '*', B.lit(0.42))
     );
-    const composed = B.binary(lit, '*', B.vec3(vignette));
+    const composed = B.binary(
+      B.binary(dofSoft, '+', B.binary(B.binary(lit, '*', B.vec3(bloom)), '*', B.vec3(B.lit(0.22)))),
+      '*',
+      B.vec3(vignette)
+    );
     const toneMapped = B.binary(composed, '/', B.binary(composed, '+', B.vec3(B.lit(1.0))));
     return B.call(
       'pow',

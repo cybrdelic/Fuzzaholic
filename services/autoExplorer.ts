@@ -190,14 +190,14 @@ function acceptanceGate(
 ): number {
   const hasSpatialMaterial = /f_rot|atan2|dot|length|smoothstep|mix/.test(code);
   const hasPaletteWork = /f_pal|vec3<f32>\([^)]*,[^)]*,[^)]*\)/.test(code);
-  const graphicsTechniqueSignals = ['normalize', 'dot', 'pow', 'smoothstep', 'length', 'clamp']
+  const graphicsTechniqueSignals = ['normalize', 'dot', 'pow', 'smoothstep', 'length', 'clamp', 'mix', 'luma', 'bloom']
     .filter(term => code.includes(term)).length;
   const tooShort = code.length < 1800;
   if (tooShort || !hasSpatialMaterial || !hasPaletteWork) return 0;
-  if (graphicsTechniqueSignals < 5) return 0;
+  if (graphicsTechniqueSignals < 7) return 0;
   if (complexity < 0.30 || restraint < 0.42 || novelty < 0.035) return 0;
   if (amateurPenalty > 0.52) return 0;
-  return clamp01((complexity * 0.24 + restraint * 0.54 + novelty * 0.14 + graphicsTechniqueSignals / 6 * 0.08) * (1 - amateurPenalty * 0.72));
+  return clamp01((complexity * 0.22 + restraint * 0.52 + novelty * 0.14 + graphicsTechniqueSignals / 9 * 0.12) * (1 - amateurPenalty * 0.72));
 }
 
 function amateurPenaltyScore(code: string, features: FeatureVector): number {

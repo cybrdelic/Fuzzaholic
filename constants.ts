@@ -26,11 +26,20 @@ fn f_graphics_surface(uv: vec2<f32>, col: vec3<f32>) -> vec3<f32> {
     let lightDir = normalize(vec3<f32>(-0.42, 0.58, 0.70));
     let viewDir = vec3<f32>(0.0, 0.0, 1.0);
     let ndotl = clamp(dot(normal, lightDir), 0.08, 1.0);
+    let halfDir = normalize(lightDir + viewDir);
+    let specular = pow(clamp(dot(normal, halfDir), 0.0, 1.0), 28.0) * 0.16;
     let fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
     let ao = clamp(1.0 - length(centered) * 0.32, 0.55, 1.0);
-    let lit = (col * (0.38 + ndotl * 0.72) + col.zyx * fresnel * 0.16) * ao;
+    let skyBounce = mix(vec3<f32>(0.05, 0.06, 0.08), col.yzx * 0.32, clamp(normal.y * 0.5 + 0.5, 0.0, 1.0));
+    let groundBounce = col.zxy * clamp(0.45 - normal.y * 0.35, 0.0, 0.32);
+    let gi = skyBounce + groundBounce;
+    let lit = (col * (0.30 + ndotl * 0.74) + gi + col.zyx * fresnel * 0.16 + vec3<f32>(specular)) * ao;
+    let luma = dot(lit, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let bloom = smoothstep(0.58, 1.12, luma);
+    let focusDepth = smoothstep(0.16, 1.18, length(centered));
+    let dofSoft = mix(lit, vec3<f32>(luma) + col.yzx * 0.18, focusDepth * 0.18);
     let vignette = 1.0 - smoothstep(0.28, 1.42, length(centered)) * 0.42;
-    let composed = lit * vignette;
+    let composed = (dofSoft + lit * bloom * 0.22) * vignette;
     let toneMapped = composed / (composed + vec3<f32>(1.0));
     return pow(clamp(toneMapped, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(0.454545));
 }
