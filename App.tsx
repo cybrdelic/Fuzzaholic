@@ -8,7 +8,7 @@ import { captureThumbnail } from './services/shaderStorage';
 import { generateAutoExplorationCandidate } from './services/autoExplorer';
 import { getFileDbHealth, getFileDbShaders, getFileDbStats, getFileDbTaste, getStorageCapability, importShadersToFileDb, importTasteToFileDb, saveShaderToFileDb, saveTasteToFileDb, StorageCapability } from './services/fileShaderDb';
 import { transformCurrentShader, ScopedTransformIntent } from './services/scopedShaderTransforms';
-import { fuzzShaderV2WithMode, generateFreshShaderV2WithMode, generateIntentShaderV2WithMode } from './services/v2Fuzzer';
+import { fuzzShaderV2WithMode, generateFreshShaderV2WithMode, generateIntentShaderV2WithMode, generateWebsiteShaderV2 } from './services/v2Fuzzer';
 import { CompilationError, FuzzConfig, FuzzMode, LogEntry, PresetName, ScrollEffectMode, TextEffectMode } from './types';
 import { buildStandaloneEmbed } from './services/embedExport';
 import { bundleFilename, createFuzzaholicBundle, downloadText, parseFuzzaholicBundle } from './services/shaderBundle';
@@ -303,6 +303,23 @@ Total Errors: ${allErrors.length}
       addLog('success', `[V2] Fresh shader generated (seed: ${seed})`);
     } catch (e) {
       addLog('error', `[V2] Generation failed: ${e}`);
+    }
+  };
+
+  const handleWebsiteGenerate = () => {
+    try {
+      addLog('info', `[Website] Generating embed-safe shader (${pipelineMode})...`);
+      setShaderBeforeMutation(lastWorkingCode);
+      setLastMutationType('website-generate');
+      const seed = Date.now();
+      const newCode = generateWebsiteShaderV2(fuzzConfig.intensity, seed, pipelineMode);
+      setCandidateBackStack(prev => [lastWorkingCode, ...prev].slice(0, 50));
+      setPendingCode(newCode);
+      setCode(newCode);
+      setHistoryCount(prev => prev + 1);
+      addLog('success', `[Website] Generated website-ready candidate (seed: ${seed})`);
+    } catch (e) {
+      addLog('error', `[Website] Generation failed: ${e}`);
     }
   };
 
@@ -882,6 +899,9 @@ Total Errors: ${allErrors.length}
               <div className="space-y-4">
                 <button onClick={handleAutoExplore} className="glass-button-primary w-full px-4 py-5 text-left text-2xl font-black uppercase leading-none">
                   Next Candidate
+                </button>
+                <button onClick={handleWebsiteGenerate} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest text-emerald-100">
+                  Website Ready
                 </button>
                 <div className="grid grid-cols-3 gap-2">
                   <button onClick={() => recordTasteAndAdvance('liked')} className="glass-button glass-good px-3 py-4 text-sm font-black uppercase">Like</button>

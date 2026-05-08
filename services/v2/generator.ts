@@ -53,7 +53,8 @@ export type GeneratorIntent =
   | 'scroll'
   | 'fragment'
   | 'vertex'
-  | 'compute';
+  | 'compute'
+  | 'website';
 
 export interface ExpressionWeights {
   literal: number;
@@ -268,6 +269,16 @@ export class ShaderGenerator {
     } else if (intent === 'vertex' || intent === 'compute') {
       logFrequency = this.rng.range(Math.log(0.45), Math.log(1.45));
       profile.layerLimit = Math.floor(this.rng.range(1, 3.999));
+    } else if (intent === 'website') {
+      logFrequency = this.rng.range(Math.log(0.22), Math.log(0.72));
+      profile.fieldDepthLimit = Math.floor(this.rng.range(1, 2.999));
+      profile.layerLimit = Math.floor(this.rng.range(0, 2.999));
+      profile.colorPassLimit = Math.floor(this.rng.range(1, 3.999));
+      profile.domainStepLimit = Math.floor(this.rng.range(0, 1.999));
+      profile.maskSharpness *= 0.68;
+      profile.colorBias *= 1.25;
+      profile.quantizationBias *= 0.08;
+      profile.restraint *= 0.62;
     }
 
     profile.frequencyScale = Math.exp(logFrequency);
