@@ -44,11 +44,11 @@ fn guide_at(uv: vec2<f32>) -> vec4<f32> {
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let px = vec2<f32>(0.00145, 0.00145);
   let pre = textureSample(shaderTexture, fillSampler, uv).rgb;
-  let rough = sin(dot(pre, vec3<f32>(4.7, -3.1, 2.6)) + uv.x * 47.0 + uv.y * 31.0 + time * 0.7);
+  let rough = sin(dot(pre, vec3<f32>(2.7, -1.6, 1.9)) + uv.x * 18.0 + uv.y * 13.0 + time * 0.32);
   let paintUv = uv + vec2<f32>(
-    sin(uv.y * 42.0 + pre.r * 7.0 + time * 0.32),
-    cos(uv.x * 38.0 + pre.g * 8.0 - time * 0.26)
-  ) * 0.006;
+    sin(uv.y * 18.0 + pre.r * 4.0 + time * 0.18),
+    cos(uv.x * 16.0 + pre.g * 4.5 - time * 0.14)
+  ) * 0.0035;
   let mask = guide_at(paintUv);
   let text = mask.r;
   let scaffold = mask.g;
@@ -61,20 +61,20 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let edge = clamp(length(grad) * 4.2, 0.0, 1.0);
 
   let grow = smoothstep(-0.24, 0.72, sin(uv.x * 8.0 + uv.y * 3.0 + time * 0.9) + scroll.y * 1.8);
-  let contourGate = smoothstep(0.18, 0.94, fract((uv.x + uv.y * 0.47) * 18.0 - time * 0.55));
+  let contourGate = smoothstep(0.18, 0.94, fract((uv.x + uv.y * 0.47) * 7.0 - time * 0.18));
   let built = clamp(text * grow + scaffold * 0.55 + incision * contourGate * 0.5, 0.0, 1.0);
   let feather = clamp(text * 0.72 + scaffold * 0.18 + incision * 0.12, 0.0, 1.0);
 
   let flow = vec2<f32>(
-    sin(time * 0.72 + uv.y * 31.0 + incision * 9.0),
-    cos(time * 0.86 + uv.x * 27.0 - scaffold * 7.0)
+    sin(time * 0.34 + uv.y * 14.0 + incision * 4.0),
+    cos(time * 0.42 + uv.x * 12.0 - scaffold * 3.5)
   );
   let bevelDir = normalize(grad + vec2<f32>(0.0001, -0.0001));
   let warp = bevelDir * (0.028 * edge + 0.012 * built) + flow * (0.004 + 0.014 * scaffold);
   let carvedUv = uv + warp * (0.5 + built);
   let refractedUv = uv - warp * (1.2 + scroll.y * 0.8);
 
-  let core = textureSample(shaderTexture, fillSampler, carvedUv + rough * scaffold * vec2<f32>(0.006, -0.004)).rgb;
+  let core = textureSample(shaderTexture, fillSampler, carvedUv + rough * scaffold * vec2<f32>(0.003, -0.002)).rgb;
   let under = textureSample(shaderTexture, fillSampler, uv + flow * 0.025).rgb;
   let r = textureSample(shaderTexture, fillSampler, refractedUv + vec2<f32>(0.008, -0.003)).r;
   let g = textureSample(shaderTexture, fillSampler, carvedUv).g;
@@ -83,15 +83,15 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
 
   let sourceEnergy = clamp(dot(core, vec3<f32>(0.299, 0.587, 0.114)), 0.0, 1.0);
   let contour = smoothstep(0.54, 0.98, sin((text + sourceEnergy + dot(uv, vec2<f32>(2.3, -1.4))) * 38.0 + time * 2.1) * 0.5 + 0.5);
-  let scan = smoothstep(0.82, 1.0, sin((uv.y + scroll.y * 0.9) * 105.0 + time * 4.4 + sourceEnergy * 5.0) * 0.5 + 0.5);
+  let scan = smoothstep(0.82, 1.0, sin((uv.y + scroll.y * 0.9) * 38.0 + time * 1.4 + sourceEnergy * 3.0) * 0.5 + 0.5);
   let bevelLight = clamp(dot(normalize(vec2<f32>(-0.45, 0.9)), bevelDir) * 0.5 + 0.5, 0.0, 1.0);
   let material = mix(core * core * 1.55, chroma, 0.34 + contour * 0.28 + scan * 0.16);
   let vein = vec3<f32>(contour * incision, scan * scaffold, scaffold * sourceEnergy) * (0.42 + sourceEnergy);
   let builtGlyph = material * (0.44 + 0.64 * bevelLight) + vein;
   let substrate = under * 0.025;
-  let spray = smoothstep(0.58, 0.96, scaffold + rough * 0.18) * (1.0 - text * 0.35);
-  let construction = vec3<f32>(0.18, 0.92, 0.72) * scaffold * (0.18 + 0.42 * scan) + chroma * spray * 0.22;
-  let alpha = clamp(feather * built + spray * 0.22, 0.0, 1.0);
+  let diffusion = smoothstep(0.48, 0.92, scaffold + rough * 0.10) * (1.0 - text * 0.42);
+  let construction = chroma * scaffold * (0.12 + 0.22 * scan) + core * diffusion * 0.18;
+  let alpha = clamp(feather * built + diffusion * 0.16, 0.0, 1.0);
   return vec4<f32>(mix(substrate + construction, builtGlyph, alpha), 1.0);
 }
 `;
@@ -221,37 +221,30 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
       ctx.stroke();
     }
     if (textMode === 'graffiti' || textMode === 'rupture') {
-      const rng = (i: number) => Math.sin(i * 127.1 + (textMode === 'graffiti' ? 9.3 : 17.8)) * 43758.5453 % 1;
-      ctx.fillStyle = 'rgb(0,96,0)';
-      for (let i = 0; i < 420; i++) {
-        const x = 160 + Math.abs(rng(i)) * 880;
-        const y = 380 + Math.abs(rng(i + 11)) * 470;
-        const radius = textMode === 'graffiti' ? 1.5 + Math.abs(rng(i + 23)) * 7 : 1 + Math.abs(rng(i + 23)) * 4;
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.strokeStyle = 'rgb(0,0,116)';
-      ctx.lineWidth = textMode === 'graffiti' ? 12 : 7;
-      for (let i = 0; i < 26; i++) {
-        const x = 210 + Math.abs(rng(i + 41)) * 780;
-        const y = 455 + Math.abs(rng(i + 71)) * 280;
-        const drop = 45 + Math.abs(rng(i + 91)) * (textMode === 'graffiti' ? 180 : 90);
+      const rng = (i: number) => Math.abs(Math.sin(i * 127.1 + (textMode === 'graffiti' ? 9.3 : 17.8)) * 43758.5453 % 1);
+      ctx.strokeStyle = 'rgb(0,82,0)';
+      ctx.lineWidth = textMode === 'graffiti' ? 9 : 5;
+      ctx.globalAlpha = textMode === 'graffiti' ? 0.72 : 0.48;
+      for (let i = 0; i < 24; i++) {
+        const x = 170 + rng(i + 41) * 860;
+        const y = 430 + rng(i + 71) * 330;
+        const span = 60 + rng(i + 91) * 180;
         ctx.beginPath();
         ctx.moveTo(x, y);
-        ctx.bezierCurveTo(x + 18 * rng(i + 3), y + drop * 0.3, x - 24 * rng(i + 5), y + drop * 0.7, x + 8 * rng(i + 7), y + drop);
+        ctx.bezierCurveTo(x + span * 0.25, y - 18 + rng(i + 3) * 36, x + span * 0.65, y + 18 - rng(i + 5) * 36, x + span, y + rng(i + 7) * 22);
         ctx.stroke();
       }
+      ctx.globalAlpha = 1;
       if (textMode === 'rupture') {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        for (let i = 0; i < 20; i++) {
-          const x = 210 + Math.abs(rng(i + 120)) * 820;
-          const y = 500 + Math.abs(rng(i + 160)) * 230;
+        for (let i = 0; i < 16; i++) {
+          const x = 210 + rng(i + 120) * 820;
+          const y = 500 + rng(i + 160) * 230;
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate(rng(i + 190) * 0.8);
-          ctx.fillRect(-70, -5, 140, 10 + Math.abs(rng(i + 200)) * 18);
+          ctx.fillRect(-55, -3, 110, 6 + rng(i + 200) * 12);
           ctx.restore();
         }
         ctx.globalCompositeOperation = 'source-over';
