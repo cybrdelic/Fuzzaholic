@@ -750,7 +750,50 @@ export class ShaderGenerator {
   }
 
   private finalizeColor(color: Expression): Expression {
-    return B.vec4(B.call('clamp', color, B.vec3(B.lit(0.0)), B.vec3(B.lit(1.0))), B.lit(1.0));
+    const shaded = this.applyGraphicsPipeline(color);
+    return B.vec4(B.call('clamp', shaded, B.vec3(B.lit(0.0)), B.vec3(B.lit(1.0))), B.lit(1.0));
+  }
+
+  private applyGraphicsPipeline(color: Expression): Expression {
+    const p = B.ident('p', 'vec2<f32>');
+    const centered = B.ident('centered', 'vec2<f32>');
+    const normal = B.call(
+      'normalize',
+      B.vec3(
+        B.binary(B.member(p, 'x'), '*', B.lit(0.36)),
+        B.binary(B.member(p, 'y'), '*', B.lit(0.36)),
+        B.lit(1.0)
+      )
+    );
+    const lightDir = B.call('normalize', B.vec3(B.lit(-0.42), B.lit(0.58), B.lit(0.70)));
+    const viewDir = B.vec3(B.lit(0.0), B.lit(0.0), B.lit(1.0));
+    const ndotl = B.call('clamp', B.call('dot', normal, lightDir), B.lit(0.08), B.lit(1.0));
+    const fresnel = B.call(
+      'pow',
+      B.binary(B.lit(1.0), '-', B.call('clamp', B.call('dot', normal, viewDir), B.lit(0.0), B.lit(1.0))),
+      B.lit(3.0)
+    );
+    const ao = B.call(
+      'clamp',
+      B.binary(B.lit(1.0), '-', B.binary(B.call('length', centered), '*', B.lit(0.32))),
+      B.lit(0.55),
+      B.lit(1.0)
+    );
+    const diffuse = B.binary(color, '*', B.vec3(B.binary(B.lit(0.38), '+', B.binary(ndotl, '*', B.lit(0.72)))));
+    const rim = B.binary(B.member(color, 'zyx'), '*', B.vec3(B.binary(fresnel, '*', B.lit(0.16))));
+    const lit = B.binary(B.binary(diffuse, '+', rim), '*', B.vec3(ao));
+    const vignette = B.binary(
+      B.lit(1.0),
+      '-',
+      B.binary(B.call('smoothstep', B.lit(0.28), B.lit(1.42), B.call('length', centered)), '*', B.lit(0.42))
+    );
+    const composed = B.binary(lit, '*', B.vec3(vignette));
+    const toneMapped = B.binary(composed, '/', B.binary(composed, '+', B.vec3(B.lit(1.0))));
+    return B.call(
+      'pow',
+      B.call('clamp', toneMapped, B.vec3(B.lit(0.0)), B.vec3(B.lit(1.0))),
+      B.vec3(B.lit(0.454545))
+    );
   }
 
   private palette(field: Expression): Expression {

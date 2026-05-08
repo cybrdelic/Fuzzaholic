@@ -20,6 +20,20 @@ fn f_smin(a: f32, b: f32, k: f32) -> f32 {
     let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
     return mix(b, a, h) - k * h * (1.0 - h);
 }
+fn f_graphics_surface(uv: vec2<f32>, col: vec3<f32>) -> vec3<f32> {
+    let centered = uv * 2.0 - 1.0;
+    let normal = normalize(vec3<f32>(centered.x * 0.36, centered.y * 0.36, 1.0));
+    let lightDir = normalize(vec3<f32>(-0.42, 0.58, 0.70));
+    let viewDir = vec3<f32>(0.0, 0.0, 1.0);
+    let ndotl = clamp(dot(normal, lightDir), 0.08, 1.0);
+    let fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
+    let ao = clamp(1.0 - length(centered) * 0.32, 0.55, 1.0);
+    let lit = (col * (0.38 + ndotl * 0.72) + col.zyx * fresnel * 0.16) * ao;
+    let vignette = 1.0 - smoothstep(0.28, 1.42, length(centered)) * 0.42;
+    let composed = lit * vignette;
+    let toneMapped = composed / (composed + vec3<f32>(1.0));
+    return pow(clamp(toneMapped, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(0.454545));
+}
 // -------------------------------
 `;
 
@@ -69,7 +83,7 @@ export const PRESETS: ShaderPreset[] = [
 @fragment
 fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     let col = 0.5 + 0.5 * cos(time + uv.xyx + vec3<f32>(0.0, 2.0, 4.0));
-    return vec4<f32>(col, 1.0);
+    return vec4<f32>(f_graphics_surface(uv, col), 1.0);
 }
 `
   },
@@ -87,7 +101,7 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     let dist = distance(uv, center);
     let wave = sin(dist * 20.0 - time * 2.0);
     let col = vec3<f32>(wave, wave, wave);
-    return vec4<f32>(col, 1.0);
+    return vec4<f32>(f_graphics_surface(uv, col), 1.0);
 }
 `
   },
@@ -108,7 +122,7 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     let cy = y + 0.5 * cos(time / 3.0);
     let v2 = sin(sqrt(100.0 * (cx*cx + cy*cy)) + time);
     let col = sin(vec3<f32>(v + v2, v + v2 + 2.0, v + v2 + 4.0));
-    return vec4<f32>(col * 0.5 + 0.5, 1.0);
+    return vec4<f32>(f_graphics_surface(uv, col * 0.5 + 0.5), 1.0);
 }
 `
   },
@@ -127,7 +141,7 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
     let line_w = 0.05;
     let lines = step(g.x, line_w) + step(g.y, line_w);
     let col = vec3<f32>(lines, lines * sin(time), lines * cos(time));
-    return vec4<f32>(col, 1.0);
+    return vec4<f32>(f_graphics_surface(uv, col), 1.0);
 }
 `
   }
