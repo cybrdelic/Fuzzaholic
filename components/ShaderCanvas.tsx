@@ -63,8 +63,7 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let grow = smoothstep(-0.24, 0.72, sin(uv.x * 8.0 + uv.y * 3.0 + time * 0.9) + scroll.y * 1.8);
   let contourGate = smoothstep(0.18, 0.94, fract((uv.x + uv.y * 0.47) * 18.0 - time * 0.55));
   let built = clamp(text * grow + scaffold * 0.55 + incision * contourGate * 0.5, 0.0, 1.0);
-  let outer = clamp(mask_at(uv + vec2<f32>(0.014, -0.012)) + mask_at(uv + vec2<f32>(-0.012, 0.014)), 0.0, 1.0);
-  let halo = clamp((outer - text) * 0.48 + edge * 0.28 + scaffold * 0.32, 0.0, 1.0);
+  let feather = clamp(text * 0.72 + scaffold * 0.18 + incision * 0.12, 0.0, 1.0);
 
   let flow = vec2<f32>(
     sin(time * 0.72 + uv.y * 31.0 + incision * 9.0),
@@ -83,16 +82,16 @@ fn main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
   let chroma = vec3<f32>(r, g, b);
 
   let sourceEnergy = clamp(dot(core, vec3<f32>(0.299, 0.587, 0.114)), 0.0, 1.0);
-  let contour = smoothstep(0.54, 0.98, sin((text + edge * 0.9 + sourceEnergy + dot(uv, vec2<f32>(2.3, -1.4))) * 38.0 + time * 2.1) * 0.5 + 0.5);
+  let contour = smoothstep(0.54, 0.98, sin((text + sourceEnergy + dot(uv, vec2<f32>(2.3, -1.4))) * 38.0 + time * 2.1) * 0.5 + 0.5);
   let scan = smoothstep(0.82, 1.0, sin((uv.y + scroll.y * 0.9) * 105.0 + time * 4.4 + sourceEnergy * 5.0) * 0.5 + 0.5);
   let bevelLight = clamp(dot(normalize(vec2<f32>(-0.45, 0.9)), bevelDir) * 0.5 + 0.5, 0.0, 1.0);
   let material = mix(core * core * 1.55, chroma, 0.34 + contour * 0.28 + scan * 0.16);
-  let vein = vec3<f32>(contour * incision, scan * edge, scaffold * sourceEnergy) * (0.42 + sourceEnergy);
-  let builtGlyph = material * (0.42 + 0.82 * bevelLight) + vein + edge * vec3<f32>(0.42, 0.48, 0.52);
-  let substrate = under * (0.025 + 0.10 * halo) + chroma * halo * 0.16;
+  let vein = vec3<f32>(contour * incision, scan * scaffold, scaffold * sourceEnergy) * (0.42 + sourceEnergy);
+  let builtGlyph = material * (0.44 + 0.64 * bevelLight) + vein;
+  let substrate = under * 0.025;
   let spray = smoothstep(0.58, 0.96, scaffold + rough * 0.18) * (1.0 - text * 0.35);
   let construction = vec3<f32>(0.18, 0.92, 0.72) * scaffold * (0.18 + 0.42 * scan) + chroma * spray * 0.22;
-  let alpha = clamp(built + edge * 0.8 + halo * 0.42 + spray * 0.28, 0.0, 1.0);
+  let alpha = clamp(feather * built + spray * 0.22, 0.0, 1.0);
   return vec4<f32>(mix(substrate + construction, builtGlyph, alpha), 1.0);
 }
 `;

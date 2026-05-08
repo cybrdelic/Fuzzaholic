@@ -30,7 +30,7 @@ export function buildStandaloneEmbed(options: EmbedExportOptions): string {
   .fuzzaholic-message { position: absolute; inset: auto 1rem 1rem; font: 700 12px/1.4 ui-monospace, monospace; color: #ff6b6b; z-index: 2; }
   .fuzzaholic-text { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font: 900 clamp(4rem, 13vw, 15rem)/0.82 Arial Black, Impact, sans-serif; color: rgba(255,255,255,.14); mix-blend-mode: screen; }
   .fuzzaholic-text[data-mode="none"] { display: none; }
-  .fuzzaholic-text[data-mode="extrude"] { text-shadow: 8px 8px 0 rgba(255,255,255,.10), 16px 16px 0 rgba(16,185,129,.15); }
+  .fuzzaholic-text[data-mode="extrude"] { text-shadow: 8px 8px 0 rgba(16,185,129,.12); }
   .fuzzaholic-text[data-mode="scan"] { letter-spacing: .14em; background: repeating-linear-gradient(0deg, transparent 0 8px, rgba(255,255,255,.18) 9px 10px); }
 </style>
 <section class="fuzzaholic-effect" data-scroll="${options.scrollEffectMode}">
