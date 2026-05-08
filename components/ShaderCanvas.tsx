@@ -173,57 +173,46 @@ const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const drawLayer = (color: string, offsetX = 0, offsetY = 0, stroke = 0) => {
+    const drawLayer = (color: string, offsetX = 0, offsetY = 0) => {
       ctx.fillStyle = color;
       ctx.strokeStyle = color;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.lineWidth = stroke || 1;
       if (textMode === 'poster') {
         ctx.font = '900 270px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('FUZZ', 600 + offsetX, 520 + offsetY);
         ctx.fillText('FUZZ', 600 + offsetX, 520 + offsetY);
         ctx.font = '900 190px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('AHOLIC', 600 + offsetX, 750 + offsetY);
         ctx.fillText('AHOLIC', 600 + offsetX, 750 + offsetY);
       } else if (textMode === 'extrude') {
         ctx.font = '900 210px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 632 + offsetY);
         ctx.fillText('FUZZAHOLIC', 600 + offsetX, 632 + offsetY);
         ctx.font = '900 82px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('SHADER LAB', 604 + offsetX, 770 + offsetY);
         ctx.fillText('SHADER LAB', 604 + offsetX, 770 + offsetY);
       } else if (textMode === 'graffiti') {
         ctx.save();
         ctx.translate(600 + offsetX, 630 + offsetY);
         ctx.rotate(-0.08);
         ctx.font = '900 235px Impact, Arial Black, sans-serif';
-        if (stroke) ctx.strokeText('FUZZ', -230, -40);
         ctx.fillText('FUZZ', -230, -40);
         ctx.rotate(0.13);
         ctx.font = '900 175px Impact, Arial Black, sans-serif';
-        if (stroke) ctx.strokeText('AHOLIC', -300, 150);
         ctx.fillText('AHOLIC', -300, 150);
         ctx.restore();
       } else if (textMode === 'rupture') {
         ctx.font = '900 188px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 610 + offsetY);
         ctx.fillText('FUZZAHOLIC', 600 + offsetX, 610 + offsetY);
         ctx.font = '900 74px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('MATERIAL TYPE', 600 + offsetX, 745 + offsetY);
         ctx.fillText('MATERIAL TYPE', 600 + offsetX, 745 + offsetY);
       } else {
         ctx.font = '900 155px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('FUZZAHOLIC', 600 + offsetX, 620 + offsetY);
         ctx.fillText('FUZZAHOLIC', 600 + offsetX, 620 + offsetY);
         ctx.font = '900 58px Arial Black, Impact, sans-serif';
-        if (stroke) ctx.strokeText('LIVE TEXTURE TYPE', 600 + offsetX, 720 + offsetY);
         ctx.fillText('LIVE TEXTURE TYPE', 600 + offsetX, 720 + offsetY);
       }
     };
 
-    drawLayer('rgb(0,72,0)', 10, -10, 18);
-    drawLayer('rgb(0,0,76)', -7, 7, textMode === 'scan' ? 10 : 4);
+    drawLayer('rgb(0,72,0)', 10, -10);
+    drawLayer('rgb(0,0,76)', -7, 7);
     ctx.strokeStyle = 'rgb(0,0,96)';
     ctx.lineWidth = textMode === 'extrude' ? 10 : 6;
     for (let y = 420; y < 810; y += textMode === 'scan' ? 22 : 38) {
