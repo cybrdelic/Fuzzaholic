@@ -135,6 +135,89 @@ export function generateFreshShaderV2WithMode(
   return generateIntentShaderV2WithMode(intensity, seed, mode, 'general');
 }
 
+export function generateWebsiteShaderV2(
+  intensity: number = 0.5,
+  seed?: number,
+  mode: PipelineMode = 'fragment'
+): string {
+  let best = '';
+  let bestScore = -Infinity;
+  const baseSeed = seed ?? Date.now();
+
+  for (let i = 0; i < 28; i++) {
+    const code = buildWebsiteShaderCandidate(Math.min(0.82, Math.max(0.18, intensity)), baseSeed + i * 3571, mode);
+    const score = scoreWebsiteShader(code);
+    if (score > bestScore) {
+      best = code;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+function buildWebsiteShaderCandidate(intensity: number, seed: number, mode: PipelineMode): string {
+  const r = seededUnit(seed);
+  const pick = <T,>(items: T[]): T => items[Math.floor(r() * items.length)]!;
+  const f = (min: number, max: number) => min + (max - min) * r();
+  const family = pick(['hero', 'editorial', 'product', 'ambient']);
+  const speed = f(0.06, 0.28) * (0.55 + intensity * 0.65);
+  const scaleA = f(0.42, 1.35);
+  const scaleB = f(1.1, 3.2);
+  const accent = [f(0.10, 0.38), f(0.24, 0.72), f(0.48, 0.92)];
+  const base = [f(0.015, 0.08), f(0.018, 0.09), f(0.025, 0.11)];
+  const warmth = f(-0.22, 0.22);
+  const angle = f(-1.4, 1.4);
+  const contrast = f(0.72, 1.18);
+  const relief = f(0.08, 0.26) * intensity;
+  const motion = f(0.04, 0.16) * intensity;
+
+  if (mode !== 'fragment') {
+    return generateIntentShaderV2WithMode(intensity * 0.45, seed, mode, 'website');
+  }
+
+  return `
+@group(0) @binding(0) var<uniform> time: f32;
+@group(0) @binding(1) var<uniform> resolution: vec2<f32>;
+@group(0) @binding(2) var<uniform> mouse: vec2<f32>;
+@group(0) @binding(3) var<uniform> scroll: vec2<f32>;
+
+@fragment
+fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+  let uv = pos.xy / resolution;
+  let centered = uv * 2.0 - 1.0;
+  let aspect = resolution.x / max(resolution.y, 1.0);
+  let t = time * ${speed.toFixed(6)};
+  let mouseNorm = clamp(mouse, vec2<f32>(0.0), vec2<f32>(1.0));
+  var p = f_rot(vec2<f32>(centered.x * aspect, centered.y), ${angle.toFixed(6)} + scroll.y * 0.08);
+  p = p + (mouseNorm - vec2<f32>(0.5)) * ${motion.toFixed(6)};
+
+  let broad = smoothstep(-0.72, 0.86, sin(dot(p, vec2<f32>(${scaleA.toFixed(6)}, ${(scaleA * 0.63).toFixed(6)})) + t));
+  let depth = smoothstep(0.15, 1.24, 1.0 - length(p * vec2<f32>(0.72, 1.0)));
+  let sweep = smoothstep(0.18, 0.92, fract(dot(uv, vec2<f32>(${scaleB.toFixed(6)}, ${(scaleB * 0.41).toFixed(6)})) * 0.22 + t * 0.12));
+  let glint = pow(max(0.0, 1.0 - length(p - vec2<f32>(0.18 + scroll.x * 0.05, -0.12))), 4.0) * ${relief.toFixed(6)};
+  let grain = (f_hash(uv * 96.0 + vec2<f32>(time * 0.01, -time * 0.013)) - 0.5) * 0.018;
+
+  let ink = vec3<f32>(${base[0].toFixed(6)}, ${base[1].toFixed(6)}, ${base[2].toFixed(6)});
+  let accent = vec3<f32>(${accent[0].toFixed(6)}, ${(accent[1] + warmth * 0.12).toFixed(6)}, ${(accent[2] - warmth * 0.08).toFixed(6)});
+  let secondary = accent.yzx * vec3<f32>(0.72, 0.84, 1.08);
+  var col = mix(ink, accent, broad * 0.58 + depth * 0.24);
+  col = mix(col, secondary, sweep * ${family === 'ambient' ? '0.18' : family === 'product' ? '0.26' : '0.34'});
+  col = col + vec3<f32>(glint) + grain;
+  col = mix(vec3<f32>(dot(col, vec3<f32>(0.299, 0.587, 0.114))), col, ${contrast.toFixed(6)});
+  return vec4<f32>(f_graphics_surface(uv, col), 1.0);
+}
+`.trim();
+}
+
+function seededUnit(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
 export function generateIntentShaderV2WithMode(
   intensity: number = 0.5,
   seed?: number,
@@ -235,6 +318,32 @@ function scoreCreativeShader(code: string): number {
   if (code.includes('vec3<f32>(')) score += 20;
   if (code.includes('f_pal') && code.includes('vec3<f32>(')) score += 10;
   if (!code.includes('p')) score -= 30;
+  return score;
+}
+
+function scoreWebsiteShader(code: string): number {
+  const count = (term: string) => code.match(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length ?? 0;
+  const lineCount = code.split('\n').filter(line => line.trim()).length;
+  const codeLength = code.length;
+  const hardCutCount = count('step') + count('floor') + count('f_hash');
+  const fractCount = count('fract');
+  const trigCount = count('sin') + count('cos');
+  const materialSignals = ['f_graphics_surface', 'mix', 'smoothstep', 'dot', 'pow', 'glint', 'grain']
+    .filter(term => code.includes(term)).length;
+  const compositionSignals = ['length', 'f_rot', 'atan2', 'centered', 'vignette']
+    .filter(term => code.includes(term)).length;
+
+  let score = 0;
+  score += materialSignals * 18;
+  score += compositionSignals * 10;
+  score += 90 * Math.exp(-Math.pow((codeLength - 4200) / 2400, 2));
+  score += 50 * Math.exp(-Math.pow((lineCount - 62) / 44, 2));
+  score -= hardCutCount * 34;
+  score -= Math.max(0, fractCount - 5) * 12;
+  score -= Math.max(0, trigCount - 18) * 7;
+  score -= code.includes('texture_storage_2d') ? 45 : 0;
+  score -= code.includes('vertex_index') ? 30 : 0;
+  score += code.includes('f_graphics_surface') ? 30 : 0;
   return score;
 }
 
