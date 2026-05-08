@@ -220,35 +220,35 @@ export class ShaderGenerator {
 
   private sampleGrammarProfile(): GrammarProfile {
     const intent = this.config.intent ?? 'general';
-    let logFrequency = this.rng.range(Math.log(0.42), Math.log(2.05));
+    let logFrequency = this.rng.range(Math.log(0.34), Math.log(1.35));
     const profile: GrammarProfile = {
       frequencyScale: 1.0,
       fieldDepthLimit: Math.floor(this.rng.range(1, 4.999)),
       layerLimit: Math.floor(this.rng.range(0, 3.999)),
       colorPassLimit: Math.floor(this.rng.range(1, 5.999)),
       domainStepLimit: Math.floor(this.rng.range(0, 3.999)),
-      weightJitter: this.rng.range(0.45, 1.85),
-      maskSharpness: this.rng.range(0.55, 1.45),
-      colorBias: this.rng.range(0.7, 1.35),
-      quantizationBias: this.rng.range(0.4, 1.25),
-      restraint: this.rng.range(0.45, 1.35),
+      weightJitter: this.rng.range(0.75, 1.35),
+      maskSharpness: this.rng.range(0.7, 1.15),
+      colorBias: this.rng.range(0.65, 1.05),
+      quantizationBias: this.rng.range(0.12, 0.55),
+      restraint: this.rng.range(0.58, 0.98),
     };
 
     if (intent === 'math') {
-      logFrequency = this.rng.range(Math.log(0.75), Math.log(2.4));
+      logFrequency = this.rng.range(Math.log(0.55), Math.log(1.55));
       profile.fieldDepthLimit = Math.floor(this.rng.range(2, 4.999));
       profile.layerLimit = Math.floor(this.rng.range(1, 3.999));
       profile.colorPassLimit = Math.floor(this.rng.range(2, 5.999));
       profile.domainStepLimit = Math.floor(this.rng.range(1, 4.999));
       profile.quantizationBias *= 0.45;
     } else if (intent === 'aesthetic') {
-      logFrequency = this.rng.range(Math.log(0.38), Math.log(1.35));
+      logFrequency = this.rng.range(Math.log(0.32), Math.log(1.05));
       profile.layerLimit = Math.floor(this.rng.range(1, 3.999));
       profile.colorPassLimit = Math.floor(this.rng.range(1, 4.999));
       profile.domainStepLimit = Math.floor(this.rng.range(0, 2.999));
-      profile.colorBias *= 1.35;
+      profile.colorBias *= 1.15;
       profile.quantizationBias *= 0.55;
-      profile.restraint *= 0.75;
+      profile.restraint *= 0.9;
     } else if (intent === 'physics') {
       logFrequency = this.rng.range(Math.log(0.45), Math.log(1.65));
       profile.fieldDepthLimit = Math.floor(this.rng.range(1, 3.999));
@@ -260,7 +260,7 @@ export class ShaderGenerator {
       profile.layerLimit = Math.floor(this.rng.range(2, 5.999));
       profile.maskSharpness *= 1.25;
     } else if (intent === 'scroll') {
-      logFrequency = this.rng.range(Math.log(0.7), Math.log(2.25));
+      logFrequency = this.rng.range(Math.log(0.5), Math.log(1.45));
       profile.layerLimit = Math.floor(this.rng.range(1, 4.999));
       profile.domainStepLimit = Math.floor(this.rng.range(1, 3.999));
       profile.maskSharpness *= 1.15;
@@ -675,7 +675,7 @@ export class ShaderGenerator {
       { value: () => B.ident('centered'), weight: 36 },
       { value: () => B.binary(B.ident('uv'), '-', B.vec2(B.lit(0.5))), weight: 18 },
       { value: () => B.vec2(B.member(B.ident('centered'), 'x'), B.binary(B.member(B.ident('centered'), 'y'), '*', B.binary(B.member(B.ident('resolution'), 'y'), '/', B.member(B.ident('resolution'), 'x')))), weight: 12 },
-      { value: () => B.binary(B.call('fract', B.binary(B.ident('uv'), '*', B.vec2(B.lit(this.freq(1.2, 6)), B.lit(this.freq(1.2, 6))))), '-', B.vec2(B.lit(0.5))), weight: 8 * this.profile.quantizationBias },
+      { value: () => B.binary(B.call('fract', B.binary(B.ident('uv'), '*', B.vec2(B.lit(this.freq(0.9, 3.2)), B.lit(this.freq(0.9, 3.2))))), '-', B.vec2(B.lit(0.5))), weight: 2 * this.profile.quantizationBias },
     ])();
 
     const steps = this.profile.domainStepLimit;
@@ -691,10 +691,10 @@ export class ShaderGenerator {
     const options: { value: () => Expression; weight: number }[] = [
       { value: () => B.call('f_rot', domain, B.binary(B.ident('t'), '*', B.lit(this.rng.range(-1.1, 1.1)))), weight: 18 },
       { value: () => B.binary(B.call('abs', domain), '-', B.vec2(B.lit(this.rng.range(0.08, 0.55)))), weight: 13 },
-      { value: () => B.binary(B.call('fract', B.binary(domain, '*', B.lit(this.freq(1.1, 5.5)))), '-', B.vec2(B.lit(0.5))), weight: 8 * this.profile.quantizationBias },
-      { value: () => B.binary(domain, '+', B.binary(B.vec2(B.call('sin', B.binary(linear, '*', B.lit(this.freq(0.8, 4)))), B.call('cos', B.binary(radial, '*', B.lit(this.freq(0.8, 4))))), '*', B.lit(this.rng.range(0.04, 0.32) * this.profile.restraint))), weight: 16 },
+      { value: () => B.binary(B.call('fract', B.binary(domain, '*', B.lit(this.freq(0.8, 2.8)))), '-', B.vec2(B.lit(0.5))), weight: 2 * this.profile.quantizationBias },
+      { value: () => B.binary(domain, '+', B.binary(B.vec2(B.call('sin', B.binary(linear, '*', B.lit(this.freq(0.45, 2.2)))), B.call('cos', B.binary(radial, '*', B.lit(this.freq(0.45, 2.2))))), '*', B.lit(this.rng.range(0.035, 0.16) * this.profile.restraint))), weight: 20 },
       { value: () => B.binary(domain, '/', B.vec2(B.binary(B.lit(0.65), '+', radial))), weight: 7 },
-      { value: () => B.binary(domain, '+', B.binary(B.vec2(B.call('f_hash', B.binary(domain, '*', B.lit(this.freq(2, 10)))), B.call('f_hash', B.binary(B.member(domain, 'yx'), '*', B.lit(this.freq(2, 10))))), '*', B.lit(this.rng.range(0.03, 0.18) * this.profile.restraint))), weight: 4 * this.profile.quantizationBias },
+      { value: () => B.binary(domain, '+', B.binary(B.vec2(B.call('f_hash', B.binary(domain, '*', B.lit(this.freq(1.2, 4)))), B.call('f_hash', B.binary(B.member(domain, 'yx'), '*', B.lit(this.freq(1.2, 4))))), '*', B.lit(this.rng.range(0.015, 0.07) * this.profile.restraint))), weight: 1.5 * this.profile.quantizationBias },
     ];
     this.metrics.operationDiversity.add('domain-step');
     return this.weightedProfile(options)();
@@ -716,12 +716,12 @@ export class ShaderGenerator {
   private generateColorAtom(): Expression {
     const field = this.generateField();
     const options: { value: () => Expression; weight: number }[] = [
-      { value: () => this.palette(field), weight: 18 },
-      { value: () => this.generateIndependentColor(), weight: 22 * this.profile.colorBias },
-      { value: () => B.vec3(this.generateScalar01(), this.generateScalar01(), this.generateScalar01()), weight: 20 },
-      { value: () => B.vec3(B.call('fract', field)), weight: 10 },
-      { value: () => B.vec3(B.member(B.ident('uv'), 'x'), B.member(B.ident('uv'), 'y'), this.generateScalar01()), weight: 8 },
-      { value: () => B.vec3(B.lit(this.rng.range(0, 1)), B.lit(this.rng.range(0, 1)), B.lit(this.rng.range(0, 1))), weight: 8 },
+      { value: () => this.palette(field), weight: 30 },
+      { value: () => this.generateIndependentColor(), weight: 14 * this.profile.colorBias },
+      { value: () => B.vec3(this.generateScalar01(), this.generateScalar01(), this.generateScalar01()), weight: 8 },
+      { value: () => B.vec3(B.call('fract', field)), weight: 3 },
+      { value: () => B.vec3(B.member(B.ident('uv'), 'x'), B.member(B.ident('uv'), 'y'), this.generateScalar01()), weight: 2 },
+      { value: () => B.vec3(B.lit(this.rng.range(0.08, 0.92)), B.lit(this.rng.range(0.08, 0.92)), B.lit(this.rng.range(0.08, 0.92))), weight: 2 },
     ];
     this.metrics.operationDiversity.add('color-atom');
     return this.weightedProfile(options)();
@@ -731,17 +731,17 @@ export class ShaderGenerator {
     const other = this.generateColorAtom();
     const a = this.generateMask();
     const b = this.generateScalar01();
-    const amount = B.lit(this.rng.range(0.05, 0.72) * this.profile.restraint);
+    const amount = B.lit(this.rng.range(0.04, 0.42) * this.profile.restraint);
     const options: { value: () => Expression; weight: number }[] = [
       { value: () => B.call('mix', color, other, a), weight: 18 },
       { value: () => B.binary(color, '+', B.binary(other, '*', B.binary(a, '*', amount))), weight: 16 },
-      { value: () => B.call('abs', B.binary(color, '-', other)), weight: 12 },
-      { value: () => B.binary(color, '*', B.binary(other, '+', B.vec3(B.lit(this.rng.range(0.05, 0.7))))), weight: 12 },
-      { value: () => B.call('mix', B.call('min', color, other), B.call('max', color, other), a), weight: 10 },
-      { value: () => B.call('pow', B.call('abs', color), B.vec3(B.lit(this.rng.range(0.45, 2.8)))), weight: 9 },
+      { value: () => B.call('abs', B.binary(color, '-', other)), weight: 4 },
+      { value: () => B.binary(color, '*', B.binary(other, '+', B.vec3(B.lit(this.rng.range(0.12, 0.45))))), weight: 8 },
+      { value: () => B.call('mix', B.call('min', color, other), B.call('max', color, other), a), weight: 4 },
+      { value: () => B.call('pow', B.call('abs', color), B.vec3(B.lit(this.rng.range(0.7, 1.8)))), weight: 6 },
       { value: () => B.call('smoothstep', B.vec3(B.lit(this.rng.range(0, 0.45))), B.vec3(B.lit(this.rng.range(0.55, 1))), color), weight: 9 },
       { value: () => B.call('mix', color, B.member(color, this.rng.pick(['yzx', 'zxy', 'xzy', 'zyx'])), b), weight: 8 },
-      { value: () => B.binary(B.call('sin', B.binary(color, '*', B.vec3(B.lit(this.freq(1, 8))))), '*', B.lit(0.5)), weight: 7 },
+      { value: () => B.binary(B.call('sin', B.binary(color, '*', B.vec3(B.lit(this.freq(0.6, 2.6))))), '*', B.lit(0.24)), weight: 3 },
       { value: () => B.call('mix', color, B.call('smoothstep', B.vec3(B.lit(0.08)), B.vec3(B.lit(0.92)), other), amount), weight: 12 },
       { value: () => B.call('mix', B.binary(color, '*', B.vec3(B.lit(this.rng.range(0.45, 0.95)))), other, B.binary(a, '*', amount)), weight: 12 },
     ];
@@ -777,10 +777,10 @@ export class ShaderGenerator {
     const [low, high] = this.thresholdPair();
     return this.weightedProfile([
       { value: () => B.call('smoothstep', low, high, field), weight: 18 },
-      { value: () => B.call('step', B.lit(this.rng.range(0.25, 0.85)), field), weight: 16 },
-      { value: () => B.call('smoothstep', low, high, B.call('fract', B.binary(field, '*', B.lit(this.freq(1.2, 8))))), weight: 28 },
-      { value: () => B.call('step', B.lit(this.rng.range(0.25, 0.85)), B.call('fract', B.binary(field, '*', B.lit(this.freq(1.2, 7))))), weight: 18 },
-      { value: () => B.call('smoothstep', low, high, B.call('abs', B.call('sin', B.binary(field, '*', B.lit(this.freq(1.5, 10)))))), weight: 20 },
+      { value: () => B.call('step', B.lit(this.rng.range(0.25, 0.85)), field), weight: 3 },
+      { value: () => B.call('smoothstep', low, high, B.call('fract', B.binary(field, '*', B.lit(this.freq(0.8, 3.5))))), weight: 14 },
+      { value: () => B.call('step', B.lit(this.rng.range(0.25, 0.85)), B.call('fract', B.binary(field, '*', B.lit(this.freq(0.8, 3.2))))), weight: 2 },
+      { value: () => B.call('smoothstep', low, high, B.call('abs', B.call('sin', B.binary(field, '*', B.lit(this.freq(0.8, 4.2)))))), weight: 18 },
     ])();
   }
 
@@ -805,10 +805,10 @@ export class ShaderGenerator {
 
     const ops: { value: () => Expression; weight: number }[] = [
       { value: () => B.binary(B.binary(left, '*', B.lit(this.rng.range(0.25, 1.25))), '+', B.binary(right, '*', B.lit(this.rng.range(0.25, 1.25)))), weight: 30 },
-      { value: () => B.call('sin', B.binary(B.binary(left, '*', B.lit(this.freq(1.0, 7))), '+', right)), weight: 20 },
-      { value: () => B.call('cos', B.binary(B.binary(left, '-', right), '*', B.lit(this.freq(1.0, 7)))), weight: 18 },
-      { value: () => B.call('fract', B.binary(left, '+', B.binary(right, '*', B.lit(this.freq(0.5, 3))))), weight: 12 },
-      { value: () => B.call('smoothstep', ...this.thresholdPair(), B.call('fract', B.binary(B.binary(left, '+', right), '*', B.lit(this.freq(1, 6))))), weight: 20 },
+      { value: () => B.call('sin', B.binary(B.binary(left, '*', B.lit(this.freq(0.7, 3.8))), '+', right)), weight: 20 },
+      { value: () => B.call('cos', B.binary(B.binary(left, '-', right), '*', B.lit(this.freq(0.7, 3.8)))), weight: 18 },
+      { value: () => B.call('fract', B.binary(left, '+', B.binary(right, '*', B.lit(this.freq(0.45, 1.8))))), weight: 3 },
+      { value: () => B.call('smoothstep', ...this.thresholdPair(), B.call('fract', B.binary(B.binary(left, '+', right), '*', B.lit(this.freq(0.7, 3))))), weight: 10 },
     ];
     return this.weightedProfile(ops)();
   }
@@ -890,11 +890,11 @@ export class ShaderGenerator {
   private colorChannelField(): Expression {
     const field = this.generateField();
     const channels: { value: () => Expression; weight: number }[] = [
-      { value: () => B.call('fract', B.binary(field, '+', B.lit(this.rng.range(0, 1)))), weight: 24 },
-      { value: () => B.binary(B.binary(B.call('sin', B.binary(field, '*', B.lit(this.freq(1, 7)))), '*', B.lit(0.5)), '+', B.lit(0.5)), weight: 22 },
-      { value: () => B.call('abs', B.call('sin', B.binary(field, '*', B.lit(this.freq(1, 8))))), weight: 18 },
-      { value: () => B.call('smoothstep', ...this.thresholdPair(), B.call('fract', field)), weight: 22 },
-      { value: () => B.call('step', B.lit(this.rng.range(0.2, 0.8)), B.call('fract', field)), weight: 14 },
+      { value: () => B.call('fract', B.binary(field, '+', B.lit(this.rng.range(0, 1)))), weight: 10 },
+      { value: () => B.binary(B.binary(B.call('sin', B.binary(field, '*', B.lit(this.freq(0.7, 3.8)))), '*', B.lit(0.5)), '+', B.lit(0.5)), weight: 28 },
+      { value: () => B.call('abs', B.call('sin', B.binary(field, '*', B.lit(this.freq(0.7, 4.2))))), weight: 12 },
+      { value: () => B.call('smoothstep', ...this.thresholdPair(), B.call('fract', field)), weight: 8 },
+      { value: () => B.call('step', B.lit(this.rng.range(0.2, 0.8)), B.call('fract', field)), weight: 1 },
     ];
     return this.weightedProfile(channels)();
   }

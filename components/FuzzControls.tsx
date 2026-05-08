@@ -7,8 +7,8 @@ const TEXT_EFFECTS: { mode: TextEffectMode; label: string; tone: string }[] = [
   { mode: 'poster', label: 'Poster', tone: 'bg-emerald-950' },
   { mode: 'extrude', label: 'Extrude', tone: 'bg-indigo-950' },
   { mode: 'scan', label: 'Scan', tone: 'bg-cyan-950' },
-  { mode: 'graffiti', label: 'Graffiti', tone: 'bg-rose-950' },
-  { mode: 'rupture', label: 'Rupture', tone: 'bg-amber-950' },
+  { mode: 'graffiti', label: 'Ink Field', tone: 'bg-rose-950' },
+  { mode: 'rupture', label: 'Erosion', tone: 'bg-amber-950' },
 ];
 
 const SCROLL_EFFECTS: { mode: ScrollEffectMode; label: string; hint: string; tone: string }[] = [

@@ -59,13 +59,13 @@ export async function generateAutoExplorationCandidate(
     const qualityGate = acceptanceGate(code, novelty, complexity, restraint, amateurPenalty);
     if (qualityGate <= 0) continue;
     const score = (
-      novelty * 0.42
-      + complexity * 0.22
-      + restraint * 0.26
-      + taste * 0.26
-      + qualityGate * 0.18
-      - repetitionPenalty * 0.24
-      - amateurPenalty * 0.34
+      novelty * 0.32
+      + complexity * 0.18
+      + restraint * 0.42
+      + taste * 0.24
+      + qualityGate * 0.20
+      - repetitionPenalty * 0.28
+      - amateurPenalty * 0.52
     );
 
     if (!best || score > best.score) {
@@ -177,8 +177,8 @@ function restraintScore(code: string, features: FeatureVector): number {
   const literals = [...features.keys()].filter(key => key.startsWith('num:')).length;
   const lengthBalance = bell(code.length, 5200, 3600);
   const vocabularyBalance = bell(calls + literals * 0.25, 18, 14);
-  const hardClipPenalty = (code.match(/clamp|step|floor|fract/g) ?? []).length / 42;
-  return clamp01(lengthBalance * 0.48 + vocabularyBalance * 0.42 + (1 - clamp01(hardClipPenalty)) * 0.1);
+  const hardClipPenalty = (code.match(/clamp|step|floor|fract/g) ?? []).length / 28;
+  return clamp01(lengthBalance * 0.42 + vocabularyBalance * 0.36 + (1 - clamp01(hardClipPenalty)) * 0.22);
 }
 
 function acceptanceGate(
@@ -192,25 +192,27 @@ function acceptanceGate(
   const hasPaletteWork = /f_pal|vec3<f32>\([^)]*,[^)]*,[^)]*\)/.test(code);
   const tooShort = code.length < 1800;
   if (tooShort || !hasSpatialMaterial || !hasPaletteWork) return 0;
-  if (complexity < 0.34 || restraint < 0.28 || novelty < 0.035) return 0;
-  if (amateurPenalty > 0.74) return 0;
-  return clamp01((complexity * 0.42 + restraint * 0.42 + novelty * 0.16) * (1 - amateurPenalty * 0.55));
+  if (complexity < 0.30 || restraint < 0.42 || novelty < 0.035) return 0;
+  if (amateurPenalty > 0.52) return 0;
+  return clamp01((complexity * 0.28 + restraint * 0.56 + novelty * 0.16) * (1 - amateurPenalty * 0.72));
 }
 
 function amateurPenaltyScore(code: string, features: FeatureVector): number {
   const count = (term: string) => code.match(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length ?? 0;
   const lineCount = code.split('\n').filter(line => line.trim()).length;
   const calls = [...features.keys()].filter(key => key.startsWith('call:')).length;
-  const hardSteps = count('step') + count('floor') + count('fract');
+  const hardSteps = count('step') * 1.7 + count('floor') * 1.4 + count('fract');
   const trigSpam = count('sin') + count('cos');
   const paletteRepeat = Math.max(0, count('f_pal') - 5);
+  const randomHash = count('f_hash');
   const lengthPenalty = code.length > 8200 ? (code.length - 8200) / 5000 : 0;
   const shortPenalty = code.length < 2200 ? (2200 - code.length) / 2200 : 0;
   const linePenalty = lineCount > 135 ? (lineCount - 135) / 80 : 0;
   const callPenalty = calls > 30 ? (calls - 30) / 26 : 0;
   return clamp01(
-    hardSteps / 44 * 0.24
-    + trigSpam / 62 * 0.18
+    hardSteps / 28 * 0.34
+    + trigSpam / 46 * 0.20
+    + randomHash / 8 * 0.16
     + paletteRepeat * 0.06
     + lengthPenalty * 0.22
     + shortPenalty * 0.28
