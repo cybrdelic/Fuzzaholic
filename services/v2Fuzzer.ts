@@ -201,39 +201,49 @@ function selectCreativeCandidate(
 
 function scoreCreativeShader(code: string): number {
   const weightedTerms = [
-    ['f_rot', 9],
-    ['atan2', 8],
-    ['smoothstep', 7],
-    ['length', 6],
-    ['mix', 6],
-    ['dot', 5],
-    ['step', 4],
-    ['sin', 3],
-    ['cos', 3],
-    ['abs', 3],
+    ['f_rot', 7],
+    ['atan2', 5],
+    ['smoothstep', 9],
+    ['length', 7],
+    ['mix', 9],
+    ['dot', 6],
+    ['pow', 5],
+    ['normalize', 5],
+    ['sin', 1.2],
+    ['cos', 1.2],
   ] as const;
   let score = 0;
   for (const [term, weight] of weightedTerms) {
     score += (code.match(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length ?? 0) * weight;
   }
   const count = (term: string) => code.match(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length ?? 0;
-  const structuralSignals = [/atan2\(/, /smoothstep\(/, /dot\(/, /f_rot\(/, /step\(/, /length\(/]
+  const structuralSignals = [/atan2\(/, /smoothstep\(/, /dot\(/, /f_rot\(/, /length\(/, /normalize\(/, /pow\(/]
     .filter((pattern) => pattern.test(code)).length;
-  score += structuralSignals * 16;
+  score += structuralSignals * 14;
 
   const hashCount = count('f_hash');
   const floorCount = count('floor');
   const fractCount = count('fract');
-  score -= Math.max(0, hashCount - 4) * 18;
-  score -= Math.max(0, floorCount - 4) * 14;
-  score -= Math.max(0, fractCount - 10) * 6;
+  const stepCount = count('step');
+  const trigCount = count('sin') + count('cos');
+  const paletteCount = count('f_pal');
+  const mixCount = count('mix');
+  score -= Math.max(0, hashCount - 1) * 28;
+  score -= Math.max(0, floorCount - 1) * 22;
+  score -= Math.max(0, fractCount - 6) * 10;
+  score -= Math.max(0, stepCount - 1) * 20;
+  score -= Math.max(0, trigCount - 16) * 5;
+  score -= Math.abs(paletteCount - 2) * 8;
+  score += Math.min(mixCount, 6) * 8;
 
   const codeLength = code.length;
-  score += Math.min(80, codeLength / 45);
-  score -= Math.max(0, codeLength - 5200) / 35;
+  score += 90 * Math.exp(-Math.pow((codeLength - 4300) / 2600, 2));
+  score -= Math.max(0, codeLength - 6800) / 22;
+  score -= Math.max(0, 2400 - codeLength) / 24;
 
   if (code.includes('vec3<f32>(')) score += 20;
-  if (code.includes('f_pal') && code.includes('vec3<f32>(')) score += 10;
+  if (code.includes('f_pal') && code.includes('vec3<f32>(')) score += 22;
+  if (code.includes('bloom') && code.includes('dofSoft')) score += 18;
   if (!code.includes('p')) score -= 30;
   return score;
 }
