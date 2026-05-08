@@ -8,7 +8,7 @@ import { captureThumbnail } from './services/shaderStorage';
 import { generateAutoExplorationCandidate } from './services/autoExplorer';
 import { getFileDbHealth, getFileDbShaders, getFileDbStats, getFileDbTaste, getStorageCapability, importShadersToFileDb, importTasteToFileDb, saveShaderToFileDb, saveTasteToFileDb, StorageCapability } from './services/fileShaderDb';
 import { transformCurrentShader, ScopedTransformIntent } from './services/scopedShaderTransforms';
-import { fuzzShaderV2WithMode, generateFreshShaderV2WithMode, generateIntentShaderV2WithMode, generateWebsiteShaderV2 } from './services/v2Fuzzer';
+import { fuzzShaderV2WithMode, generateFreshShaderV2WithMode, generateIntentShaderV2WithMode, generateSceneShaderV2, generateWebsiteShaderV2 } from './services/v2Fuzzer';
 import { CompilationError, FuzzConfig, FuzzMode, LogEntry, PresetName, ScrollEffectMode, TextEffectMode } from './types';
 import { buildStandaloneEmbed } from './services/embedExport';
 import { bundleFilename, createFuzzaholicBundle, downloadText, parseFuzzaholicBundle } from './services/shaderBundle';
@@ -75,6 +75,7 @@ const App: React.FC = () => {
   const [latestCandidateMetrics, setLatestCandidateMetrics] = useState<CandidateMetrics | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('discover');
   const [codeDockOpen, setCodeDockOpen] = useState(false);
+  const [sceneBrief, setSceneBrief] = useState('photoreal glass object in volumetric light');
   const bundleInputRef = useRef<HTMLInputElement>(null);
 
   const addLog = useCallback((type: LogEntry['type'], message: string) => {
@@ -320,6 +321,24 @@ Total Errors: ${allErrors.length}
       addLog('success', `[Website] Generated website-ready candidate (seed: ${seed})`);
     } catch (e) {
       addLog('error', `[Website] Generation failed: ${e}`);
+    }
+  };
+
+  const handleSceneGenerate = () => {
+    try {
+      addLog('info', `[Scene] Generating raymarched shader brief: ${sceneBrief || 'auto'}...`);
+      setShaderBeforeMutation(lastWorkingCode);
+      setLastMutationType('scene-generate');
+      setPipelineMode('fragment');
+      const seed = Date.now();
+      const newCode = generateSceneShaderV2(fuzzConfig.intensity, seed, 'fragment', sceneBrief);
+      setCandidateBackStack(prev => [lastWorkingCode, ...prev].slice(0, 50));
+      setPendingCode(newCode);
+      setCode(newCode);
+      setHistoryCount(prev => prev + 1);
+      addLog('success', `[Scene] Generated scene shader (seed: ${seed})`);
+    } catch (e) {
+      addLog('error', `[Scene] Generation failed: ${e}`);
     }
   };
 
@@ -903,6 +922,23 @@ Total Errors: ${allErrors.length}
                 <button onClick={handleWebsiteGenerate} className="glass-button w-full px-4 py-4 text-left text-sm font-black uppercase tracking-widest text-emerald-100">
                   Website Ready
                 </button>
+                <div className="glass-panel p-3">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500" htmlFor="scene-brief">
+                    Scene brief
+                  </label>
+                  <textarea
+                    id="scene-brief"
+                    value={sceneBrief}
+                    onChange={event => setSceneBrief(event.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="mt-2 w-full resize-none border border-white/10 bg-black/35 p-2 font-mono text-xs text-zinc-100 outline-none transition-colors placeholder:text-zinc-700 focus:border-emerald-400/50"
+                    placeholder="glass product in fog, alien canyon, ocean artifact, crystal temple"
+                  />
+                  <button onClick={handleSceneGenerate} className="glass-button mt-2 w-full px-4 py-3 text-left text-sm font-black uppercase tracking-widest text-cyan-100">
+                    Scene Shader
+                  </button>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   <button onClick={() => recordTasteAndAdvance('liked')} className="glass-button glass-good px-3 py-4 text-sm font-black uppercase">Like</button>
                   <button onClick={() => recordTasteAndAdvance('disliked')} className="glass-button px-3 py-4 text-sm font-black uppercase text-white">Nope</button>

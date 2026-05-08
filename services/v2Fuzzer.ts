@@ -157,7 +157,21 @@ export function generateWebsiteShaderV2(
   return best;
 }
 
+export function generateSceneShaderV2(
+  intensity: number = 0.5,
+  seed?: number,
+  mode: PipelineMode = 'fragment',
+  brief: string = ''
+): string {
+  const sceneSeed = ((seed ?? Date.now()) ^ hashBrief(brief)) >>> 0;
+  if (mode !== 'fragment') {
+    return generateIntentShaderV2WithMode(Math.min(1, intensity * 0.82), sceneSeed, mode, 'website');
+  }
+  return buildRaymarchedSceneShader(Math.min(1, Math.max(0.12, intensity)), sceneSeed, brief);
+}
+
 type WebsiteFamily = 'volumetric' | 'glass' | 'editorial' | 'topographic';
+type SceneKind = 'terrain' | 'architecture' | 'ocean' | 'crystal' | 'nebula' | 'product';
 
 const WEBSITE_PALETTES = [
   { base: [0.018, 0.026, 0.038], mid: [0.08, 0.22, 0.30], accent: [0.26, 0.88, 0.78], high: [0.86, 0.98, 0.92] },
@@ -170,6 +184,265 @@ const WEBSITE_PALETTES = [
 function pickWebsiteFamily(seed: number): WebsiteFamily {
   const families: WebsiteFamily[] = ['volumetric', 'glass', 'editorial', 'topographic'];
   return families[Math.abs(seed) % families.length]!;
+}
+
+function hashBrief(brief: string): number {
+  let hash = 2166136261;
+  for (const char of brief.toLowerCase()) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function inferSceneKind(brief: string, seed: number): SceneKind {
+  const text = brief.toLowerCase();
+  const has = (terms: string[]) => terms.some(term => text.includes(term));
+  if (has(['city', 'building', 'architecture', 'interior', 'temple', 'room', 'hall', 'street'])) return 'architecture';
+  if (has(['ocean', 'sea', 'water', 'liquid', 'wave', 'underwater', 'lake'])) return 'ocean';
+  if (has(['crystal', 'gem', 'ice', 'glass', 'mineral', 'diamond'])) return 'crystal';
+  if (has(['space', 'nebula', 'galaxy', 'cloud', 'smoke', 'volumetric', 'fog'])) return 'nebula';
+  if (has(['object', 'product', 'device', 'machine', 'sculpture', 'orb', 'artifact'])) return 'product';
+  if (has(['terrain', 'mountain', 'desert', 'forest', 'canyon', 'planet', 'landscape'])) return 'terrain';
+  const kinds: SceneKind[] = ['terrain', 'architecture', 'ocean', 'crystal', 'nebula', 'product'];
+  return kinds[seed % kinds.length]!;
+}
+
+function buildRaymarchedSceneShader(intensity: number, seed: number, brief: string): string {
+  const r = seededUnit(seed);
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(r() * items.length)]!;
+  const f = (min: number, max: number) => min + (max - min) * r();
+  const palette = pick(WEBSITE_PALETTES);
+  const kind = inferSceneKind(brief, seed);
+  const c = (value: readonly number[], boost = 1) => `vec3<f32>(${(value[0] * boost).toFixed(6)}, ${(value[1] * boost).toFixed(6)}, ${(value[2] * boost).toFixed(6)})`;
+  const camZ = f(-5.8, -4.2);
+  const orbit = f(-0.34, 0.34);
+  const focal = f(1.05, 1.52);
+  const sun = [f(-0.55, 0.55), f(0.52, 0.86), f(-0.30, 0.68)];
+  const density = f(0.025, 0.085) * (0.65 + intensity);
+  const detail = f(0.65, 1.35) * (0.6 + intensity * 0.65);
+  const heroObject = f(0.8, 1.35);
+  const steps = Math.floor(48 + intensity * 44);
+
+  return `
+@group(0) @binding(0) var<uniform> time: f32;
+@group(0) @binding(1) var<uniform> resolution: vec2<f32>;
+@group(0) @binding(2) var<uniform> mouse: vec2<f32>;
+@group(0) @binding(3) var<uniform> scroll: vec2<f32>;
+
+fn sdSphere(p: vec3<f32>, r: f32) -> f32 {
+  return length(p) - r;
+}
+
+fn sdBox(p: vec3<f32>, b: vec3<f32>) -> f32 {
+  let q = abs(p) - b;
+  return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+fn sdRoundBox(p: vec3<f32>, b: vec3<f32>, r: f32) -> f32 {
+  let q = abs(p) - b;
+  return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+}
+
+fn sdOctahedron(p: vec3<f32>, s: f32) -> f32 {
+  let q = abs(p);
+  return (q.x + q.y + q.z - s) * 0.57735027;
+}
+
+fn sceneMap(p: vec3<f32>) -> vec2<f32> {
+  var result = vec2<f32>(999.0, 0.0);
+${sceneMapSource(kind, detail, heroObject)}
+  return result;
+}
+
+fn materialColor(mat: f32, p: vec3<f32>) -> vec3<f32> {
+  let base = ${c(palette.base, 1.28)};
+  let mid = ${c(palette.mid, 1.25)};
+  let accent = ${c(palette.accent, 1.15)};
+  let high = ${c(palette.high, 1.05)};
+  let local = 0.5 + 0.5 * sin(dot(p.xz, vec2<f32>(0.73, -0.41)) * ${detail.toFixed(6)} + p.y * 0.65);
+  if (mat < 1.5) {
+    return mix(base, mid, local * 0.45);
+  }
+  if (mat < 2.5) {
+    return mix(mid, accent, 0.42 + local * 0.28);
+  }
+  if (mat < 3.5) {
+    return mix(accent, high, 0.34 + local * 0.38);
+  }
+  return mix(base, high, 0.25 + local * 0.32);
+}
+
+fn calcNormal(p: vec3<f32>) -> vec3<f32> {
+  let e = 0.0016;
+  let x = sceneMap(p + vec3<f32>(e, 0.0, 0.0)).x - sceneMap(p - vec3<f32>(e, 0.0, 0.0)).x;
+  let y = sceneMap(p + vec3<f32>(0.0, e, 0.0)).x - sceneMap(p - vec3<f32>(0.0, e, 0.0)).x;
+  let z = sceneMap(p + vec3<f32>(0.0, 0.0, e)).x - sceneMap(p - vec3<f32>(0.0, 0.0, e)).x;
+  return normalize(vec3<f32>(x, y, z));
+}
+
+fn softShadow(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
+  var shade = 1.0;
+  var t = 0.04;
+  for (var i = 0; i < 28; i = i + 1) {
+    let h = sceneMap(ro + rd * t).x;
+    shade = min(shade, 10.0 * h / t);
+    t = t + clamp(h, 0.025, 0.20);
+    if (h < 0.001 || t > 9.5) {
+      break;
+    }
+  }
+  return clamp(shade, 0.0, 1.0);
+}
+
+fn calcAO(p: vec3<f32>, n: vec3<f32>) -> f32 {
+  var occ = 0.0;
+  var sca = 1.0;
+  for (var i = 0; i < 5; i = i + 1) {
+    let h = 0.035 + 0.08 * f32(i);
+    let d = sceneMap(p + n * h).x;
+    occ = occ + (h - d) * sca;
+    sca = sca * 0.72;
+  }
+  return clamp(1.0 - occ * 1.7, 0.0, 1.0);
+}
+
+fn background(rd: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
+  let base = ${c(palette.base, 1.08)};
+  let mid = ${c(palette.mid, 1.05)};
+  let high = ${c(palette.high, 0.85)};
+  let sky = mix(base, mid, smoothstep(-0.35, 0.92, rd.y));
+  let sunDir = normalize(vec3<f32>(${sun[0].toFixed(6)}, ${sun[1].toFixed(6)}, ${sun[2].toFixed(6)}));
+  let sunDisc = pow(max(dot(rd, sunDir), 0.0), 70.0);
+  let haze = pow(max(0.0, 1.0 - length(uv * vec2<f32>(0.72, 1.0))), 2.3);
+  return sky + high * sunDisc * 0.65 + mid * haze * 0.18;
+}
+
+@fragment
+fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+  let pixel = (pos.xy * 2.0 - resolution) / max(resolution.y, 1.0);
+  let uv = pos.xy / resolution;
+  let mouseNorm = clamp(mouse, vec2<f32>(0.0), vec2<f32>(1.0));
+  let camAngle = ${orbit.toFixed(6)} + (mouseNorm.x - 0.5) * 0.28 + scroll.y * 0.05;
+  let ro = vec3<f32>(sin(camAngle) * 2.2, 0.55 + (mouseNorm.y - 0.5) * 0.32, ${camZ.toFixed(6)} + cos(camAngle) * 0.7);
+  let target = vec3<f32>(0.0, 0.18, 0.6);
+  let ww = normalize(target - ro);
+  let uu = normalize(cross(vec3<f32>(0.0, 1.0, 0.0), ww));
+  let vv = cross(ww, uu);
+  let rd = normalize(pixel.x * uu + pixel.y * vv + ww * ${focal.toFixed(6)});
+
+  var rayT = 0.0;
+  var mat = 0.0;
+  var hit = false;
+  for (var i = 0; i < ${steps}; i = i + 1) {
+    let sample = sceneMap(ro + rd * rayT);
+    if (sample.x < 0.0015) {
+      mat = sample.y;
+      hit = true;
+      break;
+    }
+    if (rayT > 34.0) {
+      break;
+    }
+    rayT = rayT + sample.x * 0.76;
+  }
+
+  var col = background(rd, pixel);
+  if (hit) {
+    let hp = ro + rd * rayT;
+    let n = calcNormal(hp);
+    let sunDir = normalize(vec3<f32>(${sun[0].toFixed(6)}, ${sun[1].toFixed(6)}, ${sun[2].toFixed(6)}));
+    let halfDir = normalize(sunDir - rd);
+    let albedo = materialColor(mat, hp);
+    let shadow = softShadow(hp + n * 0.018, sunDir);
+    let ao = calcAO(hp, n);
+    let diff = max(dot(n, sunDir), 0.0) * shadow;
+    let spec = pow(max(dot(n, halfDir), 0.0), mix(18.0, 72.0, clamp(mat / 4.0, 0.0, 1.0))) * shadow;
+    let fresnel = pow(1.0 - max(dot(n, -rd), 0.0), 4.0);
+    let bounce = mix(${c(palette.base, 0.9)}, ${c(palette.accent, 0.55)}, clamp(n.y * 0.5 + 0.5, 0.0, 1.0));
+    col = albedo * (0.10 + diff * 1.28) * ao + bounce * 0.26 + ${c(palette.high, 1.05)} * (spec * 0.42 + fresnel * 0.10);
+  }
+
+  let fog = 1.0 - exp(-rayT * ${density.toFixed(6)});
+  col = mix(col, background(rd, pixel), clamp(fog, 0.0, 0.92));
+  col = col / (col + vec3<f32>(1.0));
+  col = pow(clamp(col, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(0.454545));
+  return vec4<f32>(col, 1.0);
+}
+`.trim();
+}
+
+function sceneMapSource(kind: SceneKind, detail: number, heroObject: number): string {
+  if (kind === 'architecture') {
+    return `
+  let floorD = p.y + 0.82;
+  result = vec2<f32>(floorD, 1.0);
+  let backWall = abs(p.z - 3.2) - 0.08;
+  if (backWall < result.x) { result = vec2<f32>(backWall, 1.0); }
+  let arch = max(sdBox(p - vec3<f32>(0.0, 0.05, 1.2), vec3<f32>(1.35, 1.05, 0.18)), -sdSphere(p - vec3<f32>(0.0, 0.32, 1.2), 0.92));
+  if (arch < result.x) { result = vec2<f32>(arch, 2.0); }
+  let columnA = sdRoundBox(p - vec3<f32>(-0.96, -0.08, 1.05), vec3<f32>(0.13, 0.9, 0.13), 0.035);
+  let columnB = sdRoundBox(p - vec3<f32>(0.96, -0.08, 1.05), vec3<f32>(0.13, 0.9, 0.13), 0.035);
+  let columns = min(columnA, columnB);
+  if (columns < result.x) { result = vec2<f32>(columns, 3.0); }
+`;
+  }
+  if (kind === 'ocean') {
+    return `
+  let wave = sin(p.x * ${(1.7 * detail).toFixed(6)} + time * 0.42) * 0.12 + sin(p.z * ${(1.15 * detail).toFixed(6)} - time * 0.31) * 0.10;
+  let water = p.y + 0.18 - wave;
+  result = vec2<f32>(water, 2.0);
+  let island = sdSphere((p - vec3<f32>(0.15, -0.42, 1.6)) * vec3<f32>(1.0, 1.8, 0.72), ${(1.15 * heroObject).toFixed(6)});
+  if (island < result.x) { result = vec2<f32>(island, 1.0); }
+  let orb = sdSphere(p - vec3<f32>(-0.48, 0.62, 1.1), 0.28);
+  if (orb < result.x) { result = vec2<f32>(orb, 3.0); }
+`;
+  }
+  if (kind === 'crystal') {
+    return `
+  let floorD = p.y + 0.78;
+  result = vec2<f32>(floorD, 1.0);
+  let crystalP = p - vec3<f32>(0.0, 0.12, 1.35);
+  let crystalXZ = f_rot(crystalP.xz, 0.34);
+  let mainCrystal = sdOctahedron(vec3<f32>(crystalXZ.x, crystalP.y, crystalXZ.y), ${(1.1 * heroObject).toFixed(6)});
+  if (mainCrystal < result.x) { result = vec2<f32>(mainCrystal, 3.0); }
+  let shardA = sdOctahedron(p - vec3<f32>(-0.72, -0.10, 1.0), 0.62);
+  let shardB = sdOctahedron(p - vec3<f32>(0.64, -0.24, 1.52), 0.48);
+  let shards = min(shardA, shardB);
+  if (shards < result.x) { result = vec2<f32>(shards, 2.0); }
+`;
+  }
+  if (kind === 'nebula') {
+    return `
+  let shell = sdSphere(p - vec3<f32>(0.0, 0.0, 1.5), ${(1.25 * heroObject).toFixed(6)});
+  result = vec2<f32>(shell, 4.0);
+  let core = sdSphere(p - vec3<f32>(0.32, 0.08, 1.12), 0.42);
+  if (core < result.x) { result = vec2<f32>(core, 3.0); }
+  let field = p.y + 1.15 + sin(p.x * ${(1.4 * detail).toFixed(6)} + p.z * 0.5) * 0.12;
+  if (field < result.x) { result = vec2<f32>(field, 1.0); }
+`;
+  }
+  if (kind === 'product') {
+    return `
+  let floorD = p.y + 0.72;
+  result = vec2<f32>(floorD, 1.0);
+  let body = sdRoundBox(p - vec3<f32>(0.0, 0.0, 1.25), vec3<f32>(0.72, 0.42, 0.58) * ${heroObject.toFixed(6)}, 0.18);
+  if (body < result.x) { result = vec2<f32>(body, 2.0); }
+  let lens = sdSphere(p - vec3<f32>(0.18, 0.10, 0.72), 0.22);
+  if (lens < result.x) { result = vec2<f32>(lens, 3.0); }
+  let cut = sdBox(p - vec3<f32>(-0.42, 0.18, 0.78), vec3<f32>(0.18, 0.055, 0.24));
+  if (cut < result.x) { result = vec2<f32>(cut, 4.0); }
+`;
+  }
+  return `
+  let height = sin(p.x * ${(0.72 * detail).toFixed(6)} + p.z * 0.18) * 0.22 + sin(p.z * ${(0.9 * detail).toFixed(6)} - p.x * 0.14) * 0.17;
+  let terrain = p.y + 0.62 - height;
+  result = vec2<f32>(terrain, 1.0);
+  let monolith = sdRoundBox(p - vec3<f32>(0.28, 0.02, 1.55), vec3<f32>(0.28, 1.1, 0.22) * ${heroObject.toFixed(6)}, 0.045);
+  if (monolith < result.x) { result = vec2<f32>(monolith, 2.0); }
+  let moon = sdSphere(p - vec3<f32>(-0.92, 0.76, 2.4), 0.42);
+  if (moon < result.x) { result = vec2<f32>(moon, 3.0); }
+`;
 }
 
 function buildWebsiteShaderCandidate(intensity: number, seed: number, mode: PipelineMode, family: WebsiteFamily): string {
