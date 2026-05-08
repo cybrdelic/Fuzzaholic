@@ -166,19 +166,20 @@ function complexityScore(code: string, features: FeatureVector): number {
   const callKinds = [...features.keys()].filter(key => key.startsWith('call:')).length;
   const swizzleKinds = [...features.keys()].filter(key => key.startsWith('swizzle:')).length;
   const lineCount = code.split('\n').filter(line => line.trim().length > 0).length;
-  const lineBalance = bell(lineCount, 72, 58);
-  const materialSignals = ['f_pal', 'mix', 'smoothstep', 'atan2', 'f_rot', 'dot', 'length']
+  const lineBalance = bell(lineCount, 64, 42);
+  const materialSignals = ['f_pal', 'mix', 'smoothstep', 'atan2', 'f_rot', 'dot', 'length', 'normalize', 'pow']
     .filter(term => code.includes(term)).length;
-  return clamp01(callKinds / 24 * 0.36 + swizzleKinds / 14 * 0.16 + lineBalance * 0.28 + materialSignals / 7 * 0.2);
+  return clamp01(callKinds / 26 * 0.28 + swizzleKinds / 14 * 0.12 + lineBalance * 0.34 + materialSignals / 9 * 0.26);
 }
 
 function restraintScore(code: string, features: FeatureVector): number {
   const calls = [...features.keys()].filter(key => key.startsWith('call:')).length;
   const literals = [...features.keys()].filter(key => key.startsWith('num:')).length;
-  const lengthBalance = bell(code.length, 5200, 3600);
-  const vocabularyBalance = bell(calls + literals * 0.25, 18, 14);
-  const hardClipPenalty = (code.match(/clamp|step|floor|fract/g) ?? []).length / 28;
-  return clamp01(lengthBalance * 0.42 + vocabularyBalance * 0.36 + (1 - clamp01(hardClipPenalty)) * 0.22);
+  const lengthBalance = bell(code.length, 4400, 2500);
+  const vocabularyBalance = bell(calls + literals * 0.22, 20, 11);
+  const hardClipPenalty = (code.match(/step|floor|fract|f_hash/g) ?? []).length / 14;
+  const trigPenalty = (code.match(/sin|cos/g) ?? []).length / 34;
+  return clamp01(lengthBalance * 0.38 + vocabularyBalance * 0.32 + (1 - clamp01(hardClipPenalty)) * 0.20 + (1 - clamp01(trigPenalty)) * 0.10);
 }
 
 function acceptanceGate(
@@ -195,9 +196,9 @@ function acceptanceGate(
   const tooShort = code.length < 1800;
   if (tooShort || !hasSpatialMaterial || !hasPaletteWork) return 0;
   if (graphicsTechniqueSignals < 7) return 0;
-  if (complexity < 0.30 || restraint < 0.42 || novelty < 0.035) return 0;
-  if (amateurPenalty > 0.52) return 0;
-  return clamp01((complexity * 0.22 + restraint * 0.52 + novelty * 0.14 + graphicsTechniqueSignals / 9 * 0.12) * (1 - amateurPenalty * 0.72));
+  if (complexity < 0.30 || restraint < 0.56 || novelty < 0.035) return 0;
+  if (amateurPenalty > 0.38) return 0;
+  return clamp01((complexity * 0.18 + restraint * 0.58 + novelty * 0.12 + graphicsTechniqueSignals / 9 * 0.12) * (1 - amateurPenalty * 0.82));
 }
 
 function amateurPenaltyScore(code: string, features: FeatureVector): number {
