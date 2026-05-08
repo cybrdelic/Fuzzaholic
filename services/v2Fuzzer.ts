@@ -143,9 +143,10 @@ export function generateWebsiteShaderV2(
   let best = '';
   let bestScore = -Infinity;
   const baseSeed = seed ?? Date.now();
+  const family = pickWebsiteFamily(baseSeed);
 
   for (let i = 0; i < 28; i++) {
-    const code = buildWebsiteShaderCandidate(Math.min(0.82, Math.max(0.18, intensity)), baseSeed + i * 3571, mode);
+    const code = buildWebsiteShaderCandidate(Math.min(0.9, Math.max(0.18, intensity)), baseSeed + i * 3571, mode, family);
     const score = scoreWebsiteShader(code);
     if (score > bestScore) {
       best = code;
@@ -156,27 +157,42 @@ export function generateWebsiteShaderV2(
   return best;
 }
 
-function buildWebsiteShaderCandidate(intensity: number, seed: number, mode: PipelineMode): string {
+type WebsiteFamily = 'volumetric' | 'glass' | 'editorial' | 'topographic';
+
+const WEBSITE_PALETTES = [
+  { base: [0.018, 0.026, 0.038], mid: [0.08, 0.22, 0.30], accent: [0.26, 0.88, 0.78], high: [0.86, 0.98, 0.92] },
+  { base: [0.026, 0.020, 0.036], mid: [0.18, 0.10, 0.34], accent: [0.72, 0.34, 0.92], high: [0.98, 0.78, 0.48] },
+  { base: [0.035, 0.030, 0.024], mid: [0.28, 0.18, 0.10], accent: [0.95, 0.56, 0.22], high: [1.00, 0.86, 0.56] },
+  { base: [0.018, 0.028, 0.052], mid: [0.10, 0.18, 0.38], accent: [0.42, 0.64, 1.00], high: [0.86, 0.95, 1.00] },
+  { base: [0.030, 0.034, 0.031], mid: [0.18, 0.28, 0.22], accent: [0.62, 0.92, 0.58], high: [0.94, 1.00, 0.82] },
+] as const;
+
+function pickWebsiteFamily(seed: number): WebsiteFamily {
+  const families: WebsiteFamily[] = ['volumetric', 'glass', 'editorial', 'topographic'];
+  return families[Math.abs(seed) % families.length]!;
+}
+
+function buildWebsiteShaderCandidate(intensity: number, seed: number, mode: PipelineMode, family: WebsiteFamily): string {
   const r = seededUnit(seed);
-  const pick = <T,>(items: T[]): T => items[Math.floor(r() * items.length)]!;
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(r() * items.length)]!;
   const f = (min: number, max: number) => min + (max - min) * r();
-  const family = pick(['hero', 'editorial', 'product', 'ambient']);
+  const palette = pick(WEBSITE_PALETTES);
   const speed = f(0.06, 0.28) * (0.55 + intensity * 0.65);
-  const scaleA = f(0.42, 1.35);
-  const scaleB = f(1.1, 3.2);
-  const accent = [f(0.10, 0.38), f(0.24, 0.72), f(0.48, 0.92)];
-  const base = [f(0.015, 0.08), f(0.018, 0.09), f(0.025, 0.11)];
-  const warmth = f(-0.22, 0.22);
+  const scaleA = f(0.55, 1.8);
+  const scaleB = f(1.7, 4.8);
   const angle = f(-1.4, 1.4);
-  const contrast = f(0.72, 1.18);
-  const relief = f(0.08, 0.26) * intensity;
-  const motion = f(0.04, 0.16) * intensity;
+  const contrast = f(0.86, 1.32);
+  const relief = f(0.16, 0.46) * intensity;
+  const motion = f(0.035, 0.13) * intensity;
+  const spot = [f(-0.42, 0.42), f(-0.34, 0.30)];
+  const drift = [f(-0.16, 0.16), f(-0.16, 0.16)];
+  const c = (value: readonly number[], boost = 1) => `vec3<f32>(${(value[0] * boost).toFixed(6)}, ${(value[1] * boost).toFixed(6)}, ${(value[2] * boost).toFixed(6)})`;
 
   if (mode !== 'fragment') {
     return generateIntentShaderV2WithMode(intensity * 0.45, seed, mode, 'website');
   }
 
-  return `
+  const header = `
 @group(0) @binding(0) var<uniform> time: f32;
 @group(0) @binding(1) var<uniform> resolution: vec2<f32>;
 @group(0) @binding(2) var<uniform> mouse: vec2<f32>;
@@ -191,23 +207,80 @@ fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let mouseNorm = clamp(mouse, vec2<f32>(0.0), vec2<f32>(1.0));
   var p = f_rot(vec2<f32>(centered.x * aspect, centered.y), ${angle.toFixed(6)} + scroll.y * 0.08);
   p = p + (mouseNorm - vec2<f32>(0.5)) * ${motion.toFixed(6)};
+`;
 
-  let broad = smoothstep(-0.72, 0.86, sin(dot(p, vec2<f32>(${scaleA.toFixed(6)}, ${(scaleA * 0.63).toFixed(6)})) + t));
-  let depth = smoothstep(0.15, 1.24, 1.0 - length(p * vec2<f32>(0.72, 1.0)));
-  let sweep = smoothstep(0.18, 0.92, fract(dot(uv, vec2<f32>(${scaleB.toFixed(6)}, ${(scaleB * 0.41).toFixed(6)})) * 0.22 + t * 0.12));
-  let glint = pow(max(0.0, 1.0 - length(p - vec2<f32>(0.18 + scroll.x * 0.05, -0.12))), 4.0) * ${relief.toFixed(6)};
-  let grain = (f_hash(uv * 96.0 + vec2<f32>(time * 0.01, -time * 0.013)) - 0.5) * 0.018;
-
-  let ink = vec3<f32>(${base[0].toFixed(6)}, ${base[1].toFixed(6)}, ${base[2].toFixed(6)});
-  let accent = vec3<f32>(${accent[0].toFixed(6)}, ${(accent[1] + warmth * 0.12).toFixed(6)}, ${(accent[2] - warmth * 0.08).toFixed(6)});
-  let secondary = accent.yzx * vec3<f32>(0.72, 0.84, 1.08);
-  var col = mix(ink, accent, broad * 0.58 + depth * 0.24);
-  col = mix(col, secondary, sweep * ${family === 'ambient' ? '0.18' : family === 'product' ? '0.26' : '0.34'});
-  col = col + vec3<f32>(glint) + grain;
+  const footer = `
   col = mix(vec3<f32>(dot(col, vec3<f32>(0.299, 0.587, 0.114))), col, ${contrast.toFixed(6)});
   return vec4<f32>(f_graphics_surface(uv, col), 1.0);
 }
-`.trim();
+`.trimEnd();
+
+  if (family === 'glass') {
+    return `${header}
+  var q = p;
+  var caustic = 0.0;
+  for (var i = 0; i < 4; i = i + 1) {
+    let fi = f32(i) + 1.0;
+    q = f_rot(q + vec2<f32>(sin(q.y * ${scaleA.toFixed(6)} + t * fi), cos(q.x * ${(scaleA * 0.83).toFixed(6)} - t)) * 0.045, 0.42 + fi * 0.21);
+    caustic = caustic + pow(abs(sin(q.x * ${(scaleB * 1.6).toFixed(6)} + cos(q.y * ${scaleB.toFixed(6)} + t))), 7.0) / fi;
+  }
+  caustic = clamp(caustic * 0.38, 0.0, 1.0);
+  let slab = smoothstep(0.84, 0.08, abs(p.y + sin(p.x * 1.8 + t) * 0.12));
+  let lens = pow(max(0.0, 1.0 - length(p - vec2<f32>(${spot[0].toFixed(6)}, ${spot[1].toFixed(6)}))), 2.2);
+  let edgeGlow = smoothstep(0.04, 0.0, abs(length(p * vec2<f32>(0.76, 1.08)) - 0.74));
+  let grain = (f_hash(uv * 132.0 + vec2<f32>(time * 0.006, -time * 0.009)) - 0.5) * 0.012;
+  var col = mix(${c(palette.base, 1.1)}, ${c(palette.mid, 1.4)}, slab * 0.58 + lens * 0.28);
+  col = mix(col, ${c(palette.accent, 1.2)}, caustic * 0.50 + edgeGlow * 0.32);
+  col = col + ${c(palette.high, 1.15)} * (caustic * 0.18 + lens * ${relief.toFixed(6)}) + vec3<f32>(grain);
+${footer}`;
+  }
+
+  if (family === 'editorial') {
+    return `${header}
+  let stage = smoothstep(1.25, 0.08, length((p - vec2<f32>(${spot[0].toFixed(6)}, ${spot[1].toFixed(6)})) * vec2<f32>(0.82, 1.18)));
+  let band = smoothstep(0.62, 0.0, abs(dot(p, normalize(vec2<f32>(0.62, -0.78))) + sin(p.x * ${scaleA.toFixed(6)} + t) * 0.08));
+  let counter = smoothstep(0.82, 0.0, abs(dot(p, normalize(vec2<f32>(-0.36, 0.93))) - 0.28));
+  let aperture = pow(max(0.0, 1.0 - length(p * vec2<f32>(1.4, 0.82) - vec2<f32>(${drift[0].toFixed(6)}, ${drift[1].toFixed(6)}))), 3.2);
+  let quiet = smoothstep(0.12, 0.72, uv.x) * smoothstep(0.95, 0.30, uv.y);
+  let inkNoise = (f_hash(uv * 84.0 + vec2<f32>(time * 0.004)) - 0.5) * 0.010;
+  var col = mix(${c(palette.base, 1.18)}, ${c(palette.mid, 1.34)}, stage * 0.64);
+  col = mix(col, ${c(palette.accent, 1.14)}, band * quiet * 0.34 + counter * 0.18);
+  col = col + ${c(palette.high, 1.1)} * aperture * ${relief.toFixed(6)} + vec3<f32>(inkNoise);
+  col = mix(col, ${c(palette.base, 0.72)}, smoothstep(0.68, 1.18, length(centered)) * 0.42);
+${footer}`;
+  }
+
+  if (family === 'topographic') {
+    return `${header}
+  let d0 = length(p - vec2<f32>(${spot[0].toFixed(6)}, ${spot[1].toFixed(6)}));
+  let d1 = length(f_rot(p, -0.74) - vec2<f32>(${drift[0].toFixed(6)}, ${drift[1].toFixed(6)}));
+  let field = d0 * 0.72 + d1 * 0.38 + sin(dot(p, vec2<f32>(${scaleA.toFixed(6)}, ${(scaleA * -0.7).toFixed(6)})) + t) * 0.08;
+  let contour = pow(1.0 - smoothstep(0.018, 0.072, abs(fract(field * ${scaleB.toFixed(6)}) - 0.5)), 2.6);
+  let wash = smoothstep(0.18, 1.22, 1.0 - field);
+  let ridge = smoothstep(0.16, 0.82, sin(field * 5.2 - t * 0.7) * 0.5 + 0.5);
+  let paper = (f_hash(uv * 68.0) - 0.5) * 0.014;
+  var col = mix(${c(palette.base, 1.22)}, ${c(palette.mid, 1.32)}, wash * 0.52 + ridge * 0.18);
+  col = mix(col, ${c(palette.accent, 1.08)}, contour * 0.38);
+  col = col + ${c(palette.high, 1.05)} * contour * wash * ${relief.toFixed(6)} + vec3<f32>(paper);
+${footer}`;
+  }
+
+  return `${header}
+  var q = p;
+  var body = 0.0;
+  for (var i = 0; i < 3; i = i + 1) {
+    let fi = f32(i) + 1.0;
+    q = f_rot(q + vec2<f32>(sin(q.y * ${scaleA.toFixed(6)} + t), cos(q.x * ${(scaleA * 0.77).toFixed(6)} - t)) * 0.065, 0.28 + fi * 0.24);
+    body = body + smoothstep(0.92, 0.04, abs(q.y + sin(q.x * ${(scaleB * 0.72).toFixed(6)} + t * fi) * 0.18)) / fi;
+  }
+  body = clamp(body, 0.0, 1.0);
+  let halo = pow(max(0.0, 1.0 - length(p - vec2<f32>(${spot[0].toFixed(6)}, ${spot[1].toFixed(6)}))), 2.0);
+  let filament = smoothstep(0.02, 0.0, abs(p.y - sin(p.x * ${scaleB.toFixed(6)} + t) * 0.18));
+  let dust = (f_hash(uv * 110.0 + vec2<f32>(time * 0.005, time * -0.007)) - 0.5) * 0.012;
+  var col = mix(${c(palette.base, 1.12)}, ${c(palette.mid, 1.35)}, body * 0.48 + halo * 0.22);
+  col = mix(col, ${c(palette.accent, 1.16)}, filament * 0.30 + body * 0.18);
+  col = col + ${c(palette.high, 1.08)} * (halo * ${relief.toFixed(6)} + filament * 0.12) + vec3<f32>(dust);
+${footer}`;
 }
 
 function seededUnit(seed: number): () => number {
